@@ -101,7 +101,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
         if resp.includes and "users" in resp.includes:
             author = resp.includes["users"][0]
 
-        # Extract best MP4 video URL from media includes
+        # Extract smallest MP4 video URL from media includes (only audio matters)
         video_url = None
         if resp.includes and "media" in resp.includes:
             for media in resp.includes["media"]:
@@ -112,7 +112,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
                         and v.get("bit_rate", 0) > 0
                     ]
                     if mp4s:
-                        video_url = max(mp4s, key=lambda v: v["bit_rate"])["url"]
+                        video_url = min(mp4s, key=lambda v: v["bit_rate"])["url"]
                     break
 
         metrics = tweet.public_metrics or {}
@@ -153,7 +153,17 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
         author = tweet.get("author", {})
         media = tweet.get("media", {})
         videos = media.get("videos", [])
-        video_url = videos[0].get("url") if videos else None
+        video_url = None
+        if videos:
+            mp4s = [
+                v for v in (videos[0].get("variants") or [])
+                if v.get("content_type") == "video/mp4"
+                and v.get("bitrate", 0) > 0
+            ]
+            if mp4s:
+                video_url = min(mp4s, key=lambda v: v["bitrate"])["url"]
+            else:
+                video_url = videos[0].get("url")
         log.info("Fetched tweet %s via fxtwitter (by @%s, video=%s)", tweet_id, author.get("screen_name", "?"), bool(video_url))
         return {
             "text": tweet.get("text", ""),
