@@ -140,7 +140,8 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
     log.info("Fetching tweet %s via fxtwitter…", tweet_id)
     url = f"https://api.fxtwitter.com/i/status/{tweet_id}"
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; AutoAnalyst/1.0)"}
+        async with httpx.AsyncClient(timeout=15, headers=headers) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             data = resp.json()
