@@ -43,6 +43,7 @@ ANALYZE_OWN = os.environ.get("ANALYZE_OWN", "").lower() in ("1", "true", "yes")
 ANALYSIS_BACKEND = os.environ.get("ANALYSIS_BACKEND", "claude").lower()
 PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY", "")
 PERPLEXITY_MODEL = os.environ.get("PERPLEXITY_MODEL", "sonar-pro")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Tweet URL regex & dedup cache
@@ -82,6 +83,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
     """Fetch tweet via X API v2 (tweepy). Returns dict or None on failure."""
     if not X_BEARER_TOKEN:
         return None
+    log.info("Fetching tweet %s via X API…", tweet_id)
     try:
         client = _tweepy_client()
         resp = client.get_tweet(
@@ -99,6 +101,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
             author = resp.includes["users"][0]
 
         metrics = tweet.public_metrics or {}
+        log.info("Fetched tweet %s via X API (by @%s)", tweet_id, author.username)
         return {
             "text": tweet.text,
             "author_name": author.name if author else "Unknown",
@@ -115,6 +118,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
 
 async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
     """Fetch tweet via fxtwitter API (free, no auth)."""
+    log.info("Fetching tweet %s via fxtwitter…", tweet_id)
     url = f"https://api.fxtwitter.com/i/status/{tweet_id}"
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -127,6 +131,10 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
             return None
 
         author = tweet.get("author", {})
+        media = tweet.get("media", {})
+        videos = media.get("videos", [])
+        video_url = videos[0].get("url") if videos else None
+        log.info("Fetched tweet %s via fxtwitter (by @%s, video=%s)", tweet_id, author.get("screen_name", "?"), bool(video_url))
         return {
             "text": tweet.get("text", ""),
             "author_name": author.get("name", "Unknown"),
@@ -136,6 +144,7 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
             "replies": tweet.get("replies", 0),
             "created_at": tweet.get("created_at", ""),
             "community_note": tweet.get("community_note"),
+            "video_url": video_url,
         }
     except Exception:
         log.exception("fxtwitter fetch failed for tweet %s", tweet_id)
@@ -147,7 +156,105 @@ async def fetch_tweet(tweet_id: str) -> dict | None:
     result = await fetch_tweet_xapi(tweet_id)
     if result:
         return result
-    return await fetch_tweet_fxtwitter(tweet_id)
+    log.info("X API unavailable for tweet %s, falling back to fxtwitter", tweet_id)
+    result = await fetch_tweet_fxtwitter(tweet_id)
+    if result is None:
+        log.warning("All fetch methods failed for tweet %s", tweet_id)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Video transcription (OpenAI Whisper)
+# ---------------------------------------------------------------------------
+
+_VIDEO_MAX_BYTES = 25 * 1024 * 1024  # 25 MB
+
+
+async def _call_whisper_api(video_data: bytes) -> str | None:
+    """Send video bytes to OpenAI Whisper API. Returns transcript or None."""
+    log.info("Sending %d bytes to Whisper API…", len(video_data))
+    url = "https://api.openai.com/v1/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=300) as client:
+                resp = await client.post(
+                    url,
+                    headers=headers,
+                    files={"file": ("video.mp4", video_data, "video/mp4")},
+                    data={"model": "whisper-1"},
+                )
+                if resp.status_code == 429:
+                    if attempt == 0:
+                        log.warning("Whisper rate limited, retrying in 30s…")
+                        await asyncio.sleep(30)
+                        continue
+                    log.warning("Whisper rate limited after retry")
+                    return None
+                resp.raise_for_status()
+                text = resp.json().get("text")
+                log.info("Whisper API returned transcript")
+                return text
+        except httpx.HTTPStatusError:
+            log.exception("Whisper API HTTP error")
+            return None
+        except Exception:
+            log.exception("Whisper API error")
+            return None
+    return None
+
+
+async def transcribe_video(tweet: dict) -> None:
+    """Download video and transcribe via Whisper. Mutates tweet dict in place."""
+    video_url = tweet.get("video_url")
+    if not video_url:
+        log.debug("No video URL for tweet, skipping transcription")
+        return
+
+    if not OPENAI_API_KEY:
+        log.info("Video found but OPENAI_API_KEY not configured, skipping transcription")
+        tweet["video_note"] = "Video present but transcription not configured"
+        return
+
+    # Download MP4 with size limit
+    log.info("Downloading video from %s…", video_url)
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream("GET", video_url) as resp:
+                resp.raise_for_status()
+                content_length = resp.headers.get("content-length")
+                if content_length and int(content_length) > _VIDEO_MAX_BYTES:
+                    log.info("Video too large for transcription (>25 MB), skipping")
+                    tweet["video_note"] = "Video too large for transcription (>25 MB)"
+                    return
+
+                chunks = []
+                total = 0
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    total += len(chunk)
+                    if total > _VIDEO_MAX_BYTES:
+                        log.info("Video too large for transcription (>25 MB), skipping")
+                        tweet["video_note"] = "Video too large for transcription (>25 MB)"
+                        return
+                    chunks.append(chunk)
+
+        video_data = b"".join(chunks)
+    except Exception:
+        log.exception("Failed to download video from %s", video_url)
+        tweet["video_note"] = "Failed to download video for transcription"
+        return
+
+    log.info("Transcribing video (%d bytes)…", len(video_data))
+    transcript = await _call_whisper_api(video_data)
+
+    if transcript and transcript.strip():
+        video_transcript = transcript.strip()
+        tweet["video_transcript"] = video_transcript
+        log.info("Video transcribed successfully (%d chars)", len(video_transcript))
+    else:
+        log.info("Video transcription returned empty (no speech detected)")
+        tweet["video_note"] = "Video has no speech or transcription failed"
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +268,8 @@ You are a critical-thinking analyst. Given a tweet, you will:
 - Note rhetorical techniques used (appeal to emotion, false dichotomy, cherry-picking, etc.).
 - Consider important missing context.
 - If a community note is attached, incorporate it.
+- If a video transcript is provided, analyze claims made in the video alongside the tweet text.
+  Note that transcripts may contain errors.
 
 Rules:
 - Be concise: 3-6 sentences.
@@ -177,6 +286,10 @@ def _format_tweet_for_analysis(tweet: dict) -> str:
     parts.append(f"\nTweet text:\n{tweet['text']}")
     if tweet.get("community_note"):
         parts.append(f"\nCommunity Note:\n{tweet['community_note']}")
+    if tweet.get("video_transcript"):
+        parts.append(f"\nVideo transcript:\n{tweet['video_transcript']}")
+    elif tweet.get("video_note"):
+        parts.append(f"\n[{tweet['video_note']}]")
     parts.append(
         f"\nEngagement: {tweet.get('likes', 0):,} likes | "
         f"{tweet.get('retweets', 0):,} RTs | "
@@ -198,7 +311,9 @@ async def analyze_tweet_claude(tweet: dict) -> str:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_content}],
             )
-            return message.content[0].text
+            text = message.content[0].text
+            log.info("Claude analysis received (%d chars)", len(text))
+            return text
         except anthropic.RateLimitError as exc:
             if attempt == 0:
                 log.warning("Claude rate limited, retrying in 60s…")
@@ -239,7 +354,9 @@ async def analyze_tweet_perplexity(tweet: dict) -> str:
                     )
                 resp.raise_for_status()
                 data = resp.json()
-            return data["choices"][0]["message"]["content"]
+            text = data["choices"][0]["message"]["content"]
+            log.info("Perplexity analysis received (%d chars)", len(text))
+            return text
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 if attempt == 0:
@@ -257,6 +374,7 @@ async def analyze_tweet_perplexity(tweet: dict) -> str:
 
 async def analyze_tweet(tweet: dict) -> str:
     """Dispatch tweet analysis to the configured backend."""
+    log.info("Submitting tweet to %s for analysis…", ANALYSIS_BACKEND)
     if ANALYSIS_BACKEND == "perplexity":
         return await analyze_tweet_perplexity(tweet)
     return await analyze_tweet_claude(tweet)
@@ -277,6 +395,14 @@ def format_response(tweet: dict, analysis: str) -> str:
         "",
         f"<i>\"{e(tweet['text'])}\"</i>",
         "",
+    ]
+    if tweet.get("video_transcript"):
+        lines.append("<b>[Includes video transcript]</b>")
+        lines.append("")
+    elif tweet.get("video_note"):
+        lines.append(f"<i>[{e(tweet['video_note'])}]</i>")
+        lines.append("")
+    lines += [
         f"<b>Analysis:</b>\n{e(analysis)}",
         "",
         f"<b>Engagement:</b> {tweet.get('likes', 0):,} likes"
@@ -286,6 +412,7 @@ def format_response(tweet: dict, analysis: str) -> str:
     text = "\n".join(lines)
     # Telegram message limit
     if len(text) > 4096:
+        log.debug("Response truncated from %d to 4096 chars", len(text))
         text = text[:4090] + "\n…"
     return text
 
@@ -341,6 +468,7 @@ async def run():
                 await event.respond("Could not fetch tweet content — it may be deleted or private.")
                 continue
 
+            await transcribe_video(tweet)
             analysis = await analyze_tweet(tweet)
             response = format_response(tweet, analysis)
             await event.respond(response, parse_mode="html")

@@ -29,7 +29,7 @@ python3 -c "from autoanalyst import TWEET_URL_RE; print(TWEET_URL_RE.findall('ht
 Single-file design (`autoanalyst.py`, ~250 lines). The pipeline is:
 
 ```
-Incoming Telegram message → TWEET_URL_RE match → dedup check → fetch_tweet() → analyze_tweet() → format_response() → event.respond()
+Incoming Telegram message → TWEET_URL_RE match → dedup check → fetch_tweet() → transcribe_video() → analyze_tweet() → format_response() → event.respond()
 ```
 
 **Tweet fetching is two-tier:** `fetch_tweet_xapi()` (X API v2 via tweepy, requires `X_BEARER_TOKEN`) is tried first; `fetch_tweet_fxtwitter()` (free, no auth, via httpx) is the fallback. If both fail, a failure message is sent.
@@ -44,4 +44,4 @@ Incoming Telegram message → TWEET_URL_RE match → dedup check → fetch_tweet
 
 ## Configuration
 
-All config is via `.env` (see `.env.example`). `X_BEARER_TOKEN` is optional — without it, only fxtwitter is used.
+All config is via `.env` (see `.env.example`). `X_BEARER_TOKEN` is optional — without it, only fxtwitter is used. `OPENAI_API_KEY` is optional — without it, video transcription is skipped and analysis proceeds on tweet text only.
