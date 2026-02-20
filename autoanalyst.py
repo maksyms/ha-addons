@@ -89,8 +89,9 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
         resp = client.get_tweet(
             tweet_id,
             tweet_fields=["author_id", "created_at", "public_metrics", "text"],
-            expansions=["author_id"],
+            expansions=["author_id", "attachments.media_keys"],
             user_fields=["name", "username"],
+            media_fields=["type", "variants"],
         )
         if not resp.data:
             return None
@@ -100,8 +101,25 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
         if resp.includes and "users" in resp.includes:
             author = resp.includes["users"][0]
 
+        # Extract best MP4 video URL from media includes
+        video_url = None
+        if resp.includes and "media" in resp.includes:
+            for media in resp.includes["media"]:
+                if media.type == "video":
+                    mp4s = [
+                        v for v in (media.variants or [])
+                        if v.get("content_type") == "video/mp4"
+                        and v.get("bit_rate", 0) > 0
+                    ]
+                    if mp4s:
+                        video_url = max(mp4s, key=lambda v: v["bit_rate"])["url"]
+                    break
+
         metrics = tweet.public_metrics or {}
-        log.info("Fetched tweet %s via X API (by @%s)", tweet_id, author.username)
+        log.info(
+            "Fetched tweet %s via X API (by @%s, video=%s)",
+            tweet_id, author.username if author else "?", bool(video_url),
+        )
         return {
             "text": tweet.text,
             "author_name": author.name if author else "Unknown",
@@ -110,6 +128,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
             "retweets": metrics.get("retweet_count", 0),
             "replies": metrics.get("reply_count", 0),
             "created_at": str(tweet.created_at) if tweet.created_at else "",
+            "video_url": video_url,
         }
     except Exception:
         log.exception("X API fetch failed for tweet %s", tweet_id)
@@ -152,9 +171,20 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
 
 
 async def fetch_tweet(tweet_id: str) -> dict | None:
-    """Try X API first, fall back to fxtwitter."""
+    """Try X API first, fall back to fxtwitter.
+
+    When X API succeeds, a supplementary fxtwitter call fills in
+    community_note (not available via X API) and provides a video_url
+    fallback if the X API media expansion didn't return one.
+    """
     result = await fetch_tweet_xapi(tweet_id)
     if result:
+        supplement = await fetch_tweet_fxtwitter(tweet_id)
+        if supplement:
+            if not result.get("video_url") and supplement.get("video_url"):
+                result["video_url"] = supplement["video_url"]
+            if supplement.get("community_note"):
+                result["community_note"] = supplement["community_note"]
         return result
     log.info("X API unavailable for tweet %s, falling back to fxtwitter", tweet_id)
     result = await fetch_tweet_fxtwitter(tweet_id)
@@ -264,7 +294,8 @@ async def transcribe_video(tweet: dict) -> None:
 SYSTEM_PROMPT = """\
 You are a critical-thinking analyst. Given a tweet, you will:
 - Identify explicit and implicit claims made in the tweet.
-- Flag any unsupported, misleading, or false claims.
+- Research these claims using internet for accuracy and validity.
+- Flag any misleading, or false claims.
 - Note rhetorical techniques used (appeal to emotion, false dichotomy, cherry-picking, etc.).
 - Consider important missing context.
 - If a community note is attached, incorporate it.
@@ -272,7 +303,7 @@ You are a critical-thinking analyst. Given a tweet, you will:
   Note that transcripts may contain errors.
 
 Rules:
-- Be concise: 3-6 sentences.
+- Be concise: 3-5 sentences.
 - Do not moralise or editorialize.
 - Do not repeat or quote the tweet text.
 - If the tweet is straightforward and factual with no issues, say so briefly.
