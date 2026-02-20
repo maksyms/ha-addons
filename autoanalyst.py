@@ -40,6 +40,9 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 X_BEARER_TOKEN = os.environ.get("X_BEARER_TOKEN", "")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
 ANALYZE_OWN = os.environ.get("ANALYZE_OWN", "").lower() in ("1", "true", "yes")
+ANALYSIS_BACKEND = os.environ.get("ANALYSIS_BACKEND", "claude").lower()
+PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY", "")
+PERPLEXITY_MODEL = os.environ.get("PERPLEXITY_MODEL", "sonar-pro")
 
 # ---------------------------------------------------------------------------
 # Tweet URL regex & dedup cache
@@ -182,7 +185,7 @@ def _format_tweet_for_analysis(tweet: dict) -> str:
     return "\n".join(parts)
 
 
-async def analyze_tweet(tweet: dict) -> str:
+async def analyze_tweet_claude(tweet: dict) -> str:
     """Send tweet to Claude for critical analysis. Returns analysis text."""
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     user_content = _format_tweet_for_analysis(tweet)
@@ -196,16 +199,67 @@ async def analyze_tweet(tweet: dict) -> str:
                 messages=[{"role": "user", "content": user_content}],
             )
             return message.content[0].text
-        except anthropic.RateLimitError:
+        except anthropic.RateLimitError as exc:
             if attempt == 0:
                 log.warning("Claude rate limited, retrying in 60s…")
                 await asyncio.sleep(60)
             else:
-                return "⚠ Analysis unavailable (rate limited). Try again later."
-        except Exception:
+                return f"⚠ Analysis unavailable: {exc}"
+        except Exception as exc:
             log.exception("Claude API error")
-            return "⚠ Analysis unavailable due to an API error."
+            return f"⚠ Analysis unavailable: {exc}"
     return "⚠ Analysis unavailable."
+
+
+async def analyze_tweet_perplexity(tweet: dict) -> str:
+    """Send tweet to Perplexity for critical analysis. Returns analysis text."""
+    user_content = _format_tweet_for_analysis(tweet)
+
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    "https://api.perplexity.ai/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": PERPLEXITY_MODEL,
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": user_content},
+                        ],
+                        "max_tokens": 512,
+                    },
+                )
+                if resp.status_code == 429:
+                    raise httpx.HTTPStatusError(
+                        "rate limited", request=resp.request, response=resp,
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                if attempt == 0:
+                    log.warning("Perplexity rate limited, retrying in 60s…")
+                    await asyncio.sleep(60)
+                    continue
+                return f"⚠ Analysis unavailable: {exc}"
+            log.exception("Perplexity API error")
+            return f"⚠ Analysis unavailable: {exc}"
+        except Exception as exc:
+            log.exception("Perplexity API error")
+            return f"⚠ Analysis unavailable: {exc}"
+    return "⚠ Analysis unavailable."
+
+
+async def analyze_tweet(tweet: dict) -> str:
+    """Dispatch tweet analysis to the configured backend."""
+    if ANALYSIS_BACKEND == "perplexity":
+        return await analyze_tweet_perplexity(tweet)
+    return await analyze_tweet_claude(tweet)
 
 
 # ---------------------------------------------------------------------------
@@ -333,8 +387,10 @@ def main():
         missing.append("TELEGRAM_API_HASH")
     if not TELEGRAM_PEER_ID:
         missing.append("TELEGRAM_PEER_ID")
-    if not ANTHROPIC_API_KEY:
+    if ANALYSIS_BACKEND == "claude" and not ANTHROPIC_API_KEY:
         missing.append("ANTHROPIC_API_KEY")
+    if ANALYSIS_BACKEND == "perplexity" and not PERPLEXITY_API_KEY:
+        missing.append("PERPLEXITY_API_KEY")
     if missing:
         print(f"Missing required env vars: {', '.join(missing)}", file=sys.stderr)
         print("Copy .env.example to .env and fill in the values.", file=sys.stderr)
