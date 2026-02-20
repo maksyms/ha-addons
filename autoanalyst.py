@@ -33,12 +33,13 @@ log = logging.getLogger(__name__)
 # Config
 # ---------------------------------------------------------------------------
 
-TELEGRAM_API_ID = int(os.environ.get("TELEGRAM_API_ID", 0))
+TELEGRAM_API_ID = int(os.environ.get("TELEGRAM_API_ID") or 0)
 TELEGRAM_API_HASH = os.environ.get("TELEGRAM_API_HASH", "")
-TELEGRAM_PEER_ID = int(os.environ.get("TELEGRAM_PEER_ID", 0))
+TELEGRAM_PEER_ID = int(os.environ.get("TELEGRAM_PEER_ID") or 0)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 X_BEARER_TOKEN = os.environ.get("X_BEARER_TOKEN", "")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+ANALYZE_OWN = os.environ.get("ANALYZE_OWN", "").lower() in ("1", "true", "yes")
 
 # ---------------------------------------------------------------------------
 # Tweet URL regex & dedup cache
@@ -265,7 +266,10 @@ async def run():
     log.info("Logged in as %s (id=%s)", me.first_name, me.id)
     log.info("Monitoring peer %s for tweet links…", TELEGRAM_PEER_ID)
 
-    @client.on(events.NewMessage(chats=TELEGRAM_PEER_ID, incoming=True))
+    @client.on(events.NewMessage(
+        chats=TELEGRAM_PEER_ID,
+        incoming=None if ANALYZE_OWN else True,
+    ))
     async def handler(event):
         matches = TWEET_URL_RE.findall(event.raw_text or "")
         if not matches:
