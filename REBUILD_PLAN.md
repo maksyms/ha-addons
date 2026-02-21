@@ -243,6 +243,28 @@ Prompt:
 | `PERPLEXITY_MODEL` | No | `sonar-pro` | Perplexity model ID |
 | `OPENAI_API_KEY` | No | — | For Whisper video transcription |
 
+## Step 16: Home Assistant OS add-on
+
+Create the `haos-addon/` scaffold for running autoanalyst as a local HAOS add-on on a Raspberry Pi 4.
+
+### `haos-addon/config.yaml`
+
+Add-on metadata: name, description, version, slug, architectures (`aarch64`, `armv7`). Set `stdin: true` for Telethon's interactive first-run auth. Define all 11 config vars as `options` with defaults matching `.env.example`, and a `schema` mapping each to `str` (required) or `str?` (optional).
+
+### `haos-addon/Dockerfile`
+
+Based on the HA Alpine base image (`BUILD_FROM` arg). Install `python3`, `py3-pip`, and `jq` via `apk`. Copy `requirements.txt` and `pip install`. Copy `autoanalyst.py`, optional `.env*` and `autoanalyst.session` (using glob patterns so the build doesn't fail if absent), and `run.sh`.
+
+### `haos-addon/run.sh`
+
+If a bundled `.env` exists in the image, copy it to `/data/` and let `load_dotenv()` handle config. Otherwise read `/data/options.json` with `jq` and export each key as an env var. Copy a bundled session file to `/data/` on first run if not already present. `cd /data` so Telethon's session file persists, then `exec python3 /app/autoanalyst.py`.
+
+Prompt:
+
+> Create a haos-addon/ directory with three files. config.yaml: add-on metadata with name "Auto Analyst", stdin true, arch aarch64 and armv7, options for all 11 env vars with defaults, schema using str/str? types. Dockerfile: ARG BUILD_FROM from HA base, apk add python3 py3-pip jq, pip install requirements, copy autoanalyst.py, .env* glob, autoanalyst.session glob (bracket trick so COPY doesn't fail if missing), run.sh. run.sh: if .env exists in /app copy to /data, else export options.json keys via jq; copy session file to /data on first run; cd /data; exec python3 /app/autoanalyst.py.
+
+---
+
 ## Key Design Constraints
 
 These must be preserved in any rebuild:
