@@ -8,8 +8,10 @@ and posts the result back into the chat.
 
 import argparse
 import asyncio
+import base64
 import collections
 import html
+import io
 import logging
 import os
 import re
@@ -19,6 +21,7 @@ import sys
 import anthropic
 import httpx
 from dotenv import load_dotenv
+from PIL import Image
 from telethon import TelegramClient, events
 
 load_dotenv()
@@ -91,7 +94,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
             tweet_fields=["author_id", "created_at", "public_metrics", "text"],
             expansions=["author_id", "attachments.media_keys"],
             user_fields=["name", "username"],
-            media_fields=["type", "variants"],
+            media_fields=["type", "url", "variants"],
         )
         if not resp.data:
             return None
@@ -101,11 +104,14 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
         if resp.includes and "users" in resp.includes:
             author = resp.includes["users"][0]
 
-        # Extract smallest MP4 video URL from media includes (only audio matters)
+        # Extract media from includes
         video_url = None
+        image_urls = []
         if resp.includes and "media" in resp.includes:
             for media in resp.includes["media"]:
-                if media.type == "video":
+                if media.type == "photo" and getattr(media, "url", None):
+                    image_urls.append(media.url)
+                elif media.type == "video":
                     mp4s = [
                         v for v in (media.variants or [])
                         if v.get("content_type") == "video/mp4"
@@ -113,12 +119,12 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
                     ]
                     if mp4s:
                         video_url = min(mp4s, key=lambda v: v["bit_rate"])["url"]
-                    break
 
         metrics = tweet.public_metrics or {}
         log.info(
-            "Fetched tweet %s via X API (by @%s, video=%s)",
-            tweet_id, author.username if author else "?", bool(video_url),
+            "Fetched tweet %s via X API (by @%s, video=%s, images=%d)",
+            tweet_id, author.username if author else "?",
+            bool(video_url), len(image_urls),
         )
         return {
             "text": tweet.text,
@@ -129,6 +135,7 @@ async def fetch_tweet_xapi(tweet_id: str) -> dict | None:
             "replies": metrics.get("reply_count", 0),
             "created_at": str(tweet.created_at) if tweet.created_at else "",
             "video_url": video_url,
+            "image_urls": image_urls,
         }
     except Exception:
         log.exception("X API fetch failed for tweet %s", tweet_id)
@@ -152,6 +159,8 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
 
         author = tweet.get("author", {})
         media = tweet.get("media", {})
+        photos = media.get("photos", []) if media else []
+        image_urls = [p["url"] for p in photos if p.get("url")]
         videos = media.get("videos", [])
         video_url = None
         if videos:
@@ -164,7 +173,11 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
                 video_url = min(mp4s, key=lambda v: v["bitrate"])["url"]
             else:
                 video_url = videos[0].get("url")
-        log.info("Fetched tweet %s via fxtwitter (by @%s, video=%s)", tweet_id, author.get("screen_name", "?"), bool(video_url))
+        log.info(
+            "Fetched tweet %s via fxtwitter (by @%s, video=%s, images=%d)",
+            tweet_id, author.get("screen_name", "?"),
+            bool(video_url), len(image_urls),
+        )
         return {
             "text": tweet.get("text", ""),
             "author_name": author.get("name", "Unknown"),
@@ -175,6 +188,7 @@ async def fetch_tweet_fxtwitter(tweet_id: str) -> dict | None:
             "created_at": tweet.get("created_at", ""),
             "community_note": tweet.get("community_note"),
             "video_url": video_url,
+            "image_urls": image_urls,
         }
     except Exception:
         log.exception("fxtwitter fetch failed for tweet %s", tweet_id)
@@ -194,6 +208,8 @@ async def fetch_tweet(tweet_id: str) -> dict | None:
         if supplement:
             if not result.get("video_url") and supplement.get("video_url"):
                 result["video_url"] = supplement["video_url"]
+            if not result.get("image_urls") and supplement.get("image_urls"):
+                result["image_urls"] = supplement["image_urls"]
             if supplement.get("community_note"):
                 result["community_note"] = supplement["community_note"]
         return result
@@ -299,6 +315,55 @@ async def transcribe_video(tweet: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Image downloading & resizing
+# ---------------------------------------------------------------------------
+
+_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per image download
+_IMAGE_MAX_DIMENSION = 1024  # Resize longest side to this (good quality/token balance)
+
+
+async def download_and_resize_images(tweet: dict) -> None:
+    """Download tweet images and resize for AI vision. Mutates tweet dict."""
+    image_urls = tweet.get("image_urls", [])
+    if not image_urls:
+        return
+
+    images = []
+    async with httpx.AsyncClient(timeout=30) as client:
+        for url in image_urls[:4]:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                if len(resp.content) > _IMAGE_MAX_BYTES:
+                    log.info("Image too large (%d bytes), skipping: %s", len(resp.content), url)
+                    continue
+
+                img = Image.open(io.BytesIO(resp.content))
+                w, h = img.size
+
+                if max(w, h) > _IMAGE_MAX_DIMENSION:
+                    ratio = _IMAGE_MAX_DIMENSION / max(w, h)
+                    new_w, new_h = int(w * ratio), int(h * ratio)
+                    img = img.resize((new_w, new_h), Image.LANCZOS)
+                    log.info("Resized image from %dx%d to %dx%d", w, h, new_w, new_h)
+
+                if img.mode in ("RGBA", "LA", "P"):
+                    img = img.convert("RGB")
+
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=85)
+                b64 = base64.standard_b64encode(buf.getvalue()).decode()
+                images.append({"base64": b64, "media_type": "image/jpeg"})
+                log.info("Processed image (%dx%d) from %s", img.size[0], img.size[1], url)
+            except Exception:
+                log.exception("Failed to download/process image from %s", url)
+
+    if images:
+        tweet["images"] = images
+        log.info("Prepared %d image(s) for analysis", len(images))
+
+
+# ---------------------------------------------------------------------------
 # Claude analysis
 # ---------------------------------------------------------------------------
 
@@ -312,6 +377,8 @@ You are a critical-thinking analyst. Given a tweet, you will:
 - If a community note is attached, incorporate it.
 - If a video transcript is provided, analyze claims made in the video alongside the tweet text.
   Note that transcripts may contain errors.
+- If images are attached, analyze their content as part of the tweet's claims and context.
+  Consider whether images support, contradict, or add nuance to the text.
 
 Rules:
 - Be concise: 3-5 sentences.
@@ -328,6 +395,8 @@ def _format_tweet_for_analysis(tweet: dict) -> str:
     parts.append(f"\nTweet text:\n{tweet['text']}")
     if tweet.get("community_note"):
         parts.append(f"\nCommunity Note:\n{tweet['community_note']}")
+    if tweet.get("images"):
+        parts.append(f"\n[{len(tweet['images'])} image(s) attached — see above]")
     if tweet.get("video_transcript"):
         parts.append(f"\nVideo transcript:\n{tweet['video_transcript']}")
     elif tweet.get("video_note"):
@@ -343,7 +412,20 @@ def _format_tweet_for_analysis(tweet: dict) -> str:
 async def analyze_tweet_claude(tweet: dict) -> str:
     """Send tweet to Claude for critical analysis. Returns analysis text."""
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-    user_content = _format_tweet_for_analysis(tweet)
+    text_content = _format_tweet_for_analysis(tweet)
+
+    # Build multimodal content: images first, then text
+    content: list[dict] = []
+    for img in tweet.get("images", []):
+        content.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": img["media_type"],
+                "data": img["base64"],
+            },
+        })
+    content.append({"type": "text", "text": text_content})
 
     for attempt in range(2):
         try:
@@ -351,7 +433,7 @@ async def analyze_tweet_claude(tweet: dict) -> str:
                 model=CLAUDE_MODEL,
                 max_tokens=512,
                 system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_content}],
+                messages=[{"role": "user", "content": content}],
             )
             text = message.content[0].text
             log.info("Claude analysis received (%d chars)", len(text))
@@ -370,7 +452,22 @@ async def analyze_tweet_claude(tweet: dict) -> str:
 
 async def analyze_tweet_perplexity(tweet: dict) -> str:
     """Send tweet to Perplexity for critical analysis. Returns analysis text."""
-    user_content = _format_tweet_for_analysis(tweet)
+    text_content = _format_tweet_for_analysis(tweet)
+
+    # Build multimodal content for OpenAI-compatible API
+    images = tweet.get("images", [])
+    if images:
+        user_message: str | list[dict] = []
+        for img in images:
+            user_message.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{img['media_type']};base64,{img['base64']}",
+                },
+            })
+        user_message.append({"type": "text", "text": text_content})
+    else:
+        user_message = text_content
 
     for attempt in range(2):
         try:
@@ -385,7 +482,7 @@ async def analyze_tweet_perplexity(tweet: dict) -> str:
                         "model": PERPLEXITY_MODEL,
                         "messages": [
                             {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": user_content},
+                            {"role": "user", "content": user_message},
                         ],
                         "max_tokens": 512,
                     },
@@ -438,6 +535,9 @@ def format_response(tweet: dict, analysis: str) -> str:
         f"<i>\"{e(tweet['text'])}\"</i>",
         "",
     ]
+    if tweet.get("images"):
+        lines.append(f"<b>[{len(tweet['images'])} image(s) analysed]</b>")
+        lines.append("")
     if tweet.get("video_transcript"):
         lines.append("<b>[Includes video transcript]</b>")
         lines.append("")
@@ -511,6 +611,7 @@ async def run():
                 continue
 
             await transcribe_video(tweet)
+            await download_and_resize_images(tweet)
             analysis = await analyze_tweet(tweet)
             response = format_response(tweet, analysis)
             await event.respond(response, parse_mode="html")
