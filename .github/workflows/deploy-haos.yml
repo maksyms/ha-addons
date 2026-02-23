@@ -4,6 +4,9 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -27,7 +30,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add haos-addon/config.yaml
-          git commit -m "Bump HAOS addon version to ${VERSION}"
+          git commit -m "Bump HAOS addon version to ${VERSION} [skip ci]"
           git push
 
       - name: Set up SSH
