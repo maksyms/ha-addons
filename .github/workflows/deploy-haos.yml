@@ -14,6 +14,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Bump addon version
         run: |
@@ -23,13 +24,37 @@ jobs:
           new_version="${major}.${minor}.$((patch + 1))"
           sed -i "s/^version: \"${current}\"/version: \"${new_version}\"/" config.yaml
           echo "VERSION=${new_version}" >> "$GITHUB_ENV"
+          echo "PREV_VERSION=${current}" >> "$GITHUB_ENV"
           echo "Bumped version: ${current} → ${new_version}"
 
-      - name: Commit version bump
+      - name: Generate changelog
+        run: |
+          # Find the previous version bump commit to get changes since then
+          PREV_COMMIT=$(git log --oneline --grep="Bump HAOS addon version to ${PREV_VERSION}" --format="%H" -1)
+          if [ -n "$PREV_COMMIT" ]; then
+            CHANGES=$(git log --oneline "${PREV_COMMIT}..HEAD" --no-decorate \
+              | grep -v "\[skip ci\]" \
+              | sed 's/^[a-f0-9]* /- /')
+          else
+            CHANGES=$(git log --oneline -10 --no-decorate \
+              | grep -v "\[skip ci\]" \
+              | sed 's/^[a-f0-9]* /- /')
+          fi
+
+          # Prepend new version entry to CHANGELOG.md
+          CHANGELOG="haos-addon/CHANGELOG.md"
+          NEW_ENTRY="## ${VERSION}"$'\n'"${CHANGES}"
+          if [ -f "$CHANGELOG" ]; then
+            echo -e "${NEW_ENTRY}\n\n$(cat "$CHANGELOG")" > "$CHANGELOG"
+          else
+            echo "$NEW_ENTRY" > "$CHANGELOG"
+          fi
+
+      - name: Commit version bump and changelog
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add haos-addon/config.yaml
+          git add haos-addon/config.yaml haos-addon/CHANGELOG.md
           git commit -m "Bump HAOS addon version to ${VERSION} [skip ci]"
           git pull --rebase
           git push
@@ -55,6 +80,7 @@ jobs:
             haos-addon/config.yaml \
             haos-addon/Dockerfile \
             haos-addon/run.sh \
+            haos-addon/CHANGELOG.md \
             "${TARGET}:${REMOTE_DIR}/"
 
           # Upload app files referenced by Dockerfile
