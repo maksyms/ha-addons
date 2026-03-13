@@ -63,3 +63,10 @@ jobs:
             "${TARGET}:${REMOTE_DIR}/"
 
           echo "Deployed version ${VERSION} to ${TARGET}:${REMOTE_DIR}"
+
+      - name: Rebuild and restart add-on
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.HA_SSH_PORT }} -o StrictHostKeyChecking=accept-new"
+          TARGET="${{ secrets.HA_SSH_USER }}@${{ secrets.HA_SSH_HOST }}"
+
+          $SSH_CMD "$TARGET" "ha addons rebuild local_autoanalyst"
