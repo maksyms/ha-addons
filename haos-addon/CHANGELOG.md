@@ -1,3 +1,7 @@
+## 1.0.6
+- Add auto-generated changelog from commit history on deploy
+- Use 'ha apps' instead of deprecated 'ha addons' in deploy workflow
+
 ## 1.0.5
 - Auto-rebuild add-on after deploy
 - Fix deploy workflow rebase handling
