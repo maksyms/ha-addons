@@ -31,6 +31,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add haos-addon/config.yaml
           git commit -m "Bump HAOS addon version to ${VERSION} [skip ci]"
+          git pull --rebase
           git push
 
       - name: Set up SSH
