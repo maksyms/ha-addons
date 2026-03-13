@@ -70,4 +70,4 @@ jobs:
           SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.HA_SSH_PORT }} -o StrictHostKeyChecking=accept-new"
           TARGET="${{ secrets.HA_SSH_USER }}@${{ secrets.HA_SSH_HOST }}"
 
-          $SSH_CMD "$TARGET" "ha addons rebuild local_autoanalyst"
+          $SSH_CMD "$TARGET" "ha apps rebuild local_autoanalyst"
