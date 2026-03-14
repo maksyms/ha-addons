@@ -1,3 +1,6 @@
+## 1.0.10
+- Add add-on icon and logo (magnifying glass over X with alert badge)
+
 ## 1.0.9
 - Add share mapping so add-on can read /share/autoanalyst/ for .env and session
 
