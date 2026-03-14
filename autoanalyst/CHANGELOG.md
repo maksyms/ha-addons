@@ -1,3 +1,6 @@
+## 1.0.7
+- Restructure as HA custom add-on repository
+
 ## 1.0.6
 - Add auto-generated changelog from commit history on deploy
 - Use 'ha apps' instead of deprecated 'ha addons' in deploy workflow
