@@ -1,10 +1,21 @@
-# Auto Analyst
+# Auto Analyst - HA Add-on Repository
+
+A Home Assistant add-on repository containing the Auto Analyst add-on.
+
+## Installation
+
+1. In Home Assistant: **Settings → Add-ons → Add-on Store → three-dot menu → Repositories**
+2. Add this repository URL: `https://github.com/maksyms/ha-addons`
+3. Click **Add**, then refresh
+4. Find **Auto Analyst** in the store and click **Install**
+
+## Auto Analyst
 
 A Telegram userbot that monitors a private 1-2-1 chat for x.com / twitter.com links, fetches the tweet content, sends it to an LLM for critical analysis, and posts the result back into the chat.
 
 Uses [Telethon](https://docs.telethon.dev/) (MTProto Client API) because the Telegram Bot API cannot access private 1-2-1 chats.
 
-## Features
+### Features
 
 - Two-tier tweet fetching: X API v2 (primary) with fxtwitter fallback
 - Video transcription via OpenAI Whisper
@@ -13,29 +24,9 @@ Uses [Telethon](https://docs.telethon.dev/) (MTProto Client API) because the Tel
 - In-memory dedup prevents re-analyzing the same tweet
 - Graceful degradation when optional API keys are missing
 
-## Quick Start
+### Configuration
 
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # fill in credentials
-```
-
-Discover the peer ID for your target chat:
-
-```bash
-python autoanalyst.py --list-chats
-```
-
-Run the monitor:
-
-```bash
-python autoanalyst.py
-```
-
-## Configuration
-
-All config is via `.env` (see `.env.example`).
+After installing the add-on, configure it via the **Configuration** tab in the HA UI, or bundle a `.env` file in the add-on directory.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
@@ -51,23 +42,17 @@ All config is via `.env` (see `.env.example`).
 | `PERPLEXITY_MODEL` | No | `sonar-pro` | Perplexity model ID |
 | `OPENAI_API_KEY` | No | — | For Whisper video transcription |
 
-## Running on Home Assistant OS
+### First Run
 
-A pre-built add-on scaffold lives in `haos-addon/`. To deploy on a Raspberry Pi 4 (or similar) running HAOS:
+If this is the first run without a bundled session file, open the add-on's **Log** tab and complete Telethon's interactive auth. Subsequent restarts auto-connect using the persisted session.
 
-1. Copy `haos-addon/`, `autoanalyst.py`, and `requirements.txt` into `/addons/autoanalyst/` on the HA instance (via Samba or SSH add-on). Optionally include your `.env` and/or `autoanalyst.session` to skip UI configuration and Telethon re-auth.
+### Manual Deploy (Force)
 
-2. In the HA UI: **Settings → Add-ons → Add-on Store → ⋮ → Repositories** — no extra repo needed for local add-ons.
-
-3. Reload, find **Auto Analyst** under **Local add-ons**, and install.
-
-4. If you didn't bundle a `.env`, fill in the API keys and peer ID in the add-on's **Configuration** tab.
-
-5. Start the add-on. If this is the first run without a bundled session file, open the **Log** tab and complete Telethon's interactive auth. Subsequent restarts auto-connect using the persisted session.
+For direct deployment bypassing the add-on store update mechanism, trigger the GitHub Actions workflow manually with `force_deploy: true`. This uses SCP + SSH to deploy files directly to the HA instance.
 
 ## Architecture
 
-Single-file design (`autoanalyst.py`). The pipeline is:
+Single-file design (`autoanalyst/autoanalyst.py`). The pipeline is:
 
 ```
 Incoming Telegram message

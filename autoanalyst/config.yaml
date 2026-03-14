@@ -4,7 +4,7 @@ description: >-
   sends it for critical analysis, and posts the result back.
 version: "1.0.6"
 slug: autoanalyst
-url: "https://github.com/yourusername/autoanalyst"
+url: "https://github.com/maksyms/ha-addons"
 arch:
   - aarch64
   - armv7
