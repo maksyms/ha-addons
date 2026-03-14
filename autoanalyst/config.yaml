@@ -12,6 +12,8 @@ init: false
 stdin: true
 startup: application
 boot: auto
+map:
+  - share
 options:
   TELEGRAM_API_ID: ""
   TELEGRAM_API_HASH: ""
