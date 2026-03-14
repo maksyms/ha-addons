@@ -1,3 +1,6 @@
+## 1.0.8
+- Import .env and session from /share/autoanalyst/ on first run
+
 ## 1.0.7
 - Restructure as HA custom add-on repository
 
