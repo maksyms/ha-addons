@@ -1,3 +1,6 @@
+## 1.0.9
+- Add share mapping so add-on can read /share/autoanalyst/ for .env and session
+
 ## 1.0.8
 - Import .env and session from /share/autoanalyst/ on first run
 

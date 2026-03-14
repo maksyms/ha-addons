@@ -2,7 +2,7 @@ name: Auto Analyst
 description: >-
   Monitors a Telegram chat for tweet links, fetches content,
   sends it for critical analysis, and posts the result back.
-version: "1.0.8"
+version: "1.0.9"
 slug: autoanalyst
 url: "https://github.com/maksyms/ha-addons"
 arch:
