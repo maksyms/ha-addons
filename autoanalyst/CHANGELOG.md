@@ -1,3 +1,6 @@
+## 1.0.12
+- Fix env var names to match Claudegram upstream
+
 ## 1.0.11
 - Add claudecode-ea add-on and reorganize READMEs
 
