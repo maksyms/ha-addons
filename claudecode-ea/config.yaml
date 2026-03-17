@@ -1,0 +1,30 @@
+name: Claude Code EA
+description: >-
+  Telegram bot bridging to Claude Code via Agent SDK.
+  Wraps Claudegram (NachoSEO/claudegram) as a Home Assistant add-on.
+version: "1.0.0"
+slug: claudecode-ea
+url: "https://github.com/maksyms/ha-addons"
+arch:
+  - aarch64
+  - armv7
+init: false
+stdin: true
+startup: application
+boot: auto
+map:
+  - share
+options:
+  TELEGRAM_TOKEN: ""
+  ALLOWED_USERS: ""
+  ANTHROPIC_API_KEY: ""
+  DANGEROUS_MODE: "false"
+  STREAMING_MODE: "true"
+  BOT_NAME: ""
+schema:
+  TELEGRAM_TOKEN: str
+  ALLOWED_USERS: str
+  ANTHROPIC_API_KEY: str
+  DANGEROUS_MODE: str?
+  STREAMING_MODE: str?
+  BOT_NAME: str?
