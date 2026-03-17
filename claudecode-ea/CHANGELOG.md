@@ -1,3 +1,6 @@
+## 1.0.3
+- Always prefer /share/ .env over cached /data/.env on start
+
 ## 1.0.2
 
 
