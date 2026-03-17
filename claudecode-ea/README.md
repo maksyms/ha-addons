@@ -12,18 +12,18 @@ Configure via the **Configuration** tab in the HA UI, or place a `.env` file in 
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `TELEGRAM_TOKEN` | Yes | — | Bot token from [@BotFather](https://t.me/BotFather) |
-| `ALLOWED_USERS` | Yes | — | Comma-separated Telegram user IDs |
-| `ANTHROPIC_API_KEY` | Yes | — | From https://console.anthropic.com |
+| `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from [@BotFather](https://t.me/BotFather) |
+| `ALLOWED_USER_IDS` | Yes | — | Comma-separated Telegram user IDs |
+| `ANTHROPIC_API_KEY` | No | — | From https://console.anthropic.com (omit for Claude Max) |
 | `DANGEROUS_MODE` | No | `false` | Allow Claude to execute arbitrary commands |
-| `STREAMING_MODE` | No | `true` | Stream responses as they generate |
-| `BOT_NAME` | No | — | Custom name for the bot |
+| `STREAMING_MODE` | No | `streaming` | `streaming` (live-updating) or `wait` (send when complete) |
+| `BOT_NAME` | No | `Claudegram` | Custom name for the bot |
 
 ## First Run
 
 1. Create a Telegram bot via [@BotFather](https://t.me/BotFather) and note the token
 2. Get your Telegram user ID (e.g. via [@userinfobot](https://t.me/userinfobot))
-3. Set `TELEGRAM_TOKEN`, `ALLOWED_USERS`, and `ANTHROPIC_API_KEY` in the add-on config
+3. Set `TELEGRAM_BOT_TOKEN`, `ALLOWED_USER_IDS`, and `ANTHROPIC_API_KEY` in the add-on config
 4. Start the add-on and message your bot
 
 ## Env File Staging

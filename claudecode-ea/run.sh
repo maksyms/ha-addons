@@ -26,6 +26,9 @@ else
     done
 fi
 
+# Tell Claudegram where to find the .env (it looks relative to config.ts by default).
+export CLAUDEGRAM_ENV_PATH=/data/.env
+
 # Run from /data so any state persists across restarts.
 cd /data
 exec node /app/claudegram/dist/index.js

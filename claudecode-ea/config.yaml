@@ -15,15 +15,15 @@ boot: auto
 map:
   - share
 options:
-  TELEGRAM_TOKEN: ""
-  ALLOWED_USERS: ""
+  TELEGRAM_BOT_TOKEN: ""
+  ALLOWED_USER_IDS: ""
   ANTHROPIC_API_KEY: ""
   DANGEROUS_MODE: "false"
-  STREAMING_MODE: "true"
+  STREAMING_MODE: "streaming"
   BOT_NAME: ""
 schema:
-  TELEGRAM_TOKEN: str
-  ALLOWED_USERS: str
+  TELEGRAM_BOT_TOKEN: str
+  ALLOWED_USER_IDS: str
   ANTHROPIC_API_KEY: str
   DANGEROUS_MODE: str?
   STREAMING_MODE: str?
