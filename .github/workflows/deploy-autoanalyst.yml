@@ -3,6 +3,8 @@ name: Deploy HAOS Add-on
 on:
   push:
     branches: [master]
+    paths:
+      - 'autoanalyst/**'
   workflow_dispatch:
     inputs:
       force_deploy:
