@@ -1,3 +1,6 @@
+## 1.0.11
+- Add claudecode-ea add-on and reorganize READMEs
+
 ## 1.0.10
 - Add add-on icon and logo (magnifying glass over X with alert badge)
 
