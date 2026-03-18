@@ -1,3 +1,7 @@
+## 1.0.4
+- feat(claudecode-ea): add OneDrive sync, MCP server, project templates
+- docs: update CLAUDE.md for full repo, add personal assistant implementation plan
+
 ## 1.0.3
 - Always prefer /share/ .env over cached /data/.env on start
 
