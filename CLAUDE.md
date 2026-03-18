@@ -4,60 +4,113 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Telegram "userbot" that monitors a 1-2-1 private chat for x.com/twitter.com links, fetches the tweet content, sends it to Claude for critical analysis, and posts the result back into the chat. Uses Telethon (MTProto Client API) because the Telegram Bot API cannot access private 1-2-1 chats.
+A Home Assistant custom add-on repository (`repository.json` at root) containing two add-ons:
 
-Deployed as a Home Assistant add-on. The repo is structured as an HA custom add-on repository (`repository.json` at root, add-on in `autoanalyst/` subdirectory).
+1. **autoanalyst/** — Telegram userbot that monitors a private chat for tweet links, fetches content, sends it to Claude for critical analysis, and posts back. Uses Telethon (MTProto).
+2. **claudecode-ea/** — Telegram bot bridging to Claude Code via Agent SDK. Wraps [Claudegram](https://github.com/NachoSEO/claudegram) as an HA add-on.
 
-## Commands
+## Repository Structure
+
+```
+├── repository.json              # HA add-on repository metadata
+├── autoanalyst/                 # Tweet analysis userbot add-on
+│   ├── config.yaml
+│   ├── Dockerfile
+│   ├── run.sh
+│   ├── CHANGELOG.md
+│   ├── autoanalyst.py           # Main application (~250 lines)
+│   ├── requirements.txt
+│   └── .env.example
+├── claudecode-ea/               # Claude Code Telegram bot add-on
+│   ├── config.yaml              # HA add-on manifest (v1.0.2, aarch64+armv7)
+│   ├── Dockerfile               # Alpine + Node.js + Claude Code CLI; clones Claudegram at build
+│   ├── run.sh                   # Three-tier env: /share/.env → /data/.env → options.json
+│   ├── CHANGELOG.md
+│   ├── README.md
+│   ├── .env.example
+│   ├── icon.png
+│   └── logo.png
+└── .github/workflows/
+    ├── deploy-autoanalyst.yml   # CI/CD for autoanalyst
+    └── deploy-claudecode-ea.yml # CI/CD for claudecode-ea
+```
+
+## CI/CD
+
+Each add-on has a separate deploy workflow triggered by pushes to `master` with path filters. Both workflows:
+- Auto-bump patch version in `config.yaml`
+- Generate changelog from git log since last version bump
+- Commit with `[skip ci]` to avoid loops
+
+`deploy-claudecode-ea.yml` also supports `workflow_dispatch` with a `force_deploy` option that SCPs files to the HA host and runs `ha apps rebuild`.
+
+---
+
+## autoanalyst
+
+### Commands
 
 ```bash
-# Setup
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r autoanalyst/requirements.txt
 cp autoanalyst/.env.example autoanalyst/.env  # then fill in credentials
-
-# Discover Telegram peer ID (interactive auth on first run)
-python autoanalyst/autoanalyst.py --list-chats
-
-# Run the monitor
-python autoanalyst/autoanalyst.py
-
-# Test regex standalone
-python3 -c "from autoanalyst.autoanalyst import TWEET_URL_RE; print(TWEET_URL_RE.findall('https://x.com/user/status/123'))"
+python autoanalyst/autoanalyst.py --list-chats  # discover peer ID
+python autoanalyst/autoanalyst.py               # run the monitor
 ```
 
-## Architecture
+### Architecture
 
-Single-file design (`autoanalyst/autoanalyst.py`, ~250 lines). The pipeline is:
+Single-file design (`autoanalyst/autoanalyst.py`). Pipeline:
 
 ```
 Incoming Telegram message → TWEET_URL_RE match → dedup check → fetch_tweet() → transcribe_video() → analyze_tweet() → format_response() → event.respond()
 ```
 
-**Tweet fetching is two-tier:** `fetch_tweet_xapi()` (X API v2 via tweepy, requires `X_BEARER_TOKEN`) is tried first; `fetch_tweet_fxtwitter()` (free, no auth, via httpx) is the fallback. If both fail, a failure message is sent.
+**Tweet fetching is two-tier:** `fetch_tweet_xapi()` (X API v2 via tweepy) first; `fetch_tweet_fxtwitter()` (free, no auth) fallback.
 
 **Key constraints:**
-- Telegram messages use HTML parse mode (not Markdown) — special chars in tweets break Markdown
-- All user-content in responses must go through `html.escape()`
-- Telegram message limit is 4096 chars — responses are truncated
-- Only incoming messages from `TELEGRAM_PEER_ID` are processed (not the user's own messages)
-- Dedup cache is in-memory `OrderedDict`, last 100 tweet IDs
+- Telegram messages use HTML parse mode (not Markdown)
+- All user-content must go through `html.escape()`
+- Telegram message limit is 4096 chars
+- Only incoming messages from `TELEGRAM_PEER_ID` are processed
+- Dedup cache: in-memory `OrderedDict`, last 100 tweet IDs
 - Claude rate limit: one retry after 60s, then graceful failure
 
-## Configuration
+### Configuration
 
-All config is via `.env` (see `autoanalyst/.env.example`). `X_BEARER_TOKEN` is optional — without it, only fxtwitter is used. `OPENAI_API_KEY` is optional — without it, video transcription is skipped and analysis proceeds on tweet text only.
+All via `.env` (see `autoanalyst/.env.example`). `X_BEARER_TOKEN` optional (fxtwitter fallback). `OPENAI_API_KEY` optional (video transcription skipped without it).
 
-## Repository Structure
+---
 
-```
-├── repository.json          # HA add-on repository metadata
-├── autoanalyst/             # The add-on (directory name = slug)
-│   ├── config.yaml          # HA add-on config
-│   ├── Dockerfile
-│   ├── run.sh
-│   ├── CHANGELOG.md
-│   ├── autoanalyst.py       # Main application
-│   ├── requirements.txt
-│   └── .env.example
-```
+## claudecode-ea
+
+### Architecture
+
+Wraps upstream [Claudegram](https://github.com/NachoSEO/claudegram) — cloned at Docker build time (`git clone --depth 1`), built with `npm ci && npm run build`, then run as `node /app/claudegram/dist/index.js`.
+
+Claude Code CLI is installed globally (`npm install -g @anthropic-ai/claude-code`) — required by the Agent SDK that Claudegram uses.
+
+### Configuration
+
+Six options configurable via HA UI or `/share/claudecode-ea/.env`:
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from @BotFather |
+| `ALLOWED_USER_IDS` | Yes | — | Comma-separated Telegram user IDs |
+| `ANTHROPIC_API_KEY` | No | — | Anthropic API key (omit for Claude Max) |
+| `DANGEROUS_MODE` | No | `false` | Allow Claude to execute arbitrary commands |
+| `STREAMING_MODE` | No | `streaming` | `streaming` or `wait` |
+| `BOT_NAME` | No | `Claudegram` | Custom bot name |
+
+### run.sh Config Priority
+
+1. `/share/claudecode-ea/.env` (always copied to `/data/.env` if present)
+2. `/data/.env` (persisted from previous run)
+3. Generated from `/data/options.json` (HA UI values)
+
+### Key Details
+
+- `init: false`, `stdin: true` in config.yaml
+- Only aarch64 + armv7 (no amd64)
+- Claudegram is always latest upstream at build time
