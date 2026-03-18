@@ -18,14 +18,91 @@ Configure via the **Configuration** tab in the HA UI, or place a `.env` file in 
 | `DANGEROUS_MODE` | No | `false` | Allow Claude to execute arbitrary commands |
 | `STREAMING_MODE` | No | `streaming` | `streaming` (live-updating) or `wait` (send when complete) |
 | `BOT_NAME` | No | `Claudegram` | Custom name for the bot |
+| `ONEDRIVE_PROJECTS_PATH` | No | — | OneDrive folder path to sync (e.g. `Documents/AI-Projects`) |
+| `RCLONE_SYNC_INTERVAL` | No | `300` | Sync interval in seconds (default: 5 minutes) |
+| `RCLONE_REMOTE_NAME` | No | `onedrive` | rclone remote name |
+| `RCLONE_CONFIG_PATH` | No | auto | Path to rclone.conf (auto-detected from `/share/claudecode-ea/` or `/data/`) |
+| `ONEDRIVE_MCP_ENABLED` | No | `true` | Enable OneDrive MCP server for on-demand file access |
+| `AZURE_CLIENT_ID` | No | — | Azure app registration client ID for OneDrive MCP auth |
+| `CLAUDE_CODE_BUBBLEWRAP` | No | `1` | Bypass root-user check (required for HA add-on) |
 
 ## First Run
 
 1. Create a Telegram bot via [@BotFather](https://t.me/BotFather) and note the token
 2. Get your Telegram user ID (e.g. via [@userinfobot](https://t.me/userinfobot))
 3. Set `TELEGRAM_BOT_TOKEN`, `ALLOWED_USER_IDS`, and `ANTHROPIC_API_KEY` in the add-on config
-4. Start the add-on and message your bot
+4. **(Optional)** Set up rclone for OneDrive sync:
+   - On the HA host, run: `docker exec -it addon_<hash>_claudecode-ea rclone config`
+   - Follow the interactive setup to create an `onedrive` remote
+   - The config is saved to `/data/rclone.conf` (persists across restarts)
+   - Alternatively, place a pre-configured `rclone.conf` in `/share/claudecode-ea/`
+   - Set `ONEDRIVE_PROJECTS_PATH` to the folder you want to sync (e.g. `Documents/AI-Projects`)
+5. Start the add-on and message your bot
+
+## Multi-Project Setup
+
+Claudegram's `/project` command lets you switch between projects in your `WORKSPACE_DIR`. Each project is a subdirectory with its own context:
+
+- **`CLAUDE.md`** — project-specific instructions for Claude (see `templates/CLAUDE.md.template` for a starter)
+- **`memory.md`** — persistent project knowledge (Claude updates this after each conversation)
+- **`history/`** — conversation summaries (archived in `YYYY-MM-DD-HHMMSS.md` format)
+
+When you switch projects or end a conversation, Claude automatically:
+1. Saves a summary to `history/YYYY-MM-DD-HHMMSS.md`
+2. Updates `memory.md` with new durable knowledge (facts, decisions, preferences)
+
+This gives Claude long-term memory per project, even across sessions.
+
+## OneDrive Integration
+
+The add-on includes two OneDrive integrations:
+
+### 1. rclone Sync (Bidirectional Background Sync)
+
+When `ONEDRIVE_PROJECTS_PATH` is set, the add-on uses rclone to sync your OneDrive projects folder locally:
+
+- **Initial pull** on startup (remote → local)
+- **Bidirectional sync** every `RCLONE_SYNC_INTERVAL` seconds (default: 5 minutes)
+- Uses `rclone copy --update` (newer files win, nothing is deleted)
+- Local path is `/share/claudecode-ea/projects`, automatically set as `WORKSPACE_DIR`
+
+**Setup rclone.conf:**
+```bash
+# SSH into HA host or use Terminal add-on
+docker exec -it addon_<hash>_claudecode-ea rclone config
+
+# Interactive setup:
+# - New remote → "onedrive"
+# - Storage: Microsoft OneDrive
+# - Follow OAuth flow (opens browser)
+```
+
+Or place a pre-configured `rclone.conf` in `/share/claudecode-ea/`.
+
+### 2. OneDrive MCP (On-Demand File Access)
+
+When `AZURE_CLIENT_ID` is set, the add-on configures the [OneDrive MCP server](https://github.com/MrFixit96/onedrive-mcp-server) for on-demand access to files outside the synced folder:
+
+- Browse, search, download, and edit OneDrive files via Claude
+- Uses Microsoft Graph API with device-code auth
+- Tokens are cached in `/data/onedrive-mcp-token-cache.json`
+
+**Setup Azure App Registration:**
+1. Go to [Azure Portal](https://portal.azure.com) → App registrations → New registration
+2. Name: `Claude Code OneDrive MCP`
+3. Supported account types: **Personal Microsoft accounts only**
+4. Redirect URI: leave blank
+5. After creation, copy the **Application (client) ID** → set as `AZURE_CLIENT_ID`
+6. Go to **API permissions** → Add permission → Microsoft Graph → Delegated → `Files.ReadWrite.All`
+7. Go to **Authentication** → Advanced settings → **Allow public client flows** → Yes
+
+**First-run device auth:**
+On first start, check the add-on logs. You'll see:
+```
+To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code XXXXXXXXX
+```
+Visit the URL, enter the code, and sign in. After that, auth is automatic.
 
 ## Env File Staging
 
-Place a `.env` file in `/share/claudecode-ea/` on the HA host. On first start, the add-on copies it to persistent storage. This is useful when migrating or setting up from a file rather than the UI.
+Place a `.env` file in `/share/claudecode-ea/` on the HA host. On startup, the add-on always prefers this file over the cached `/data/.env`. This is useful when migrating or setting up from a file rather than the UI.

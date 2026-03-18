@@ -1,0 +1,26 @@
+# [PROJECT_NAME] Project
+
+## About This Project
+<!-- Describe what this project is about, your goals, and any important context -->
+
+## Instructions
+- You are my personal assistant for the [PROJECT_NAME] project.
+- Read `memory.md` in this directory at the start of every conversation for accumulated context.
+- Be concise but thorough. Ask clarifying questions when my intent is unclear.
+
+## Conversation History
+After each conversation (when I switch projects or say goodbye):
+1. Save a summary to `history/YYYY-MM-DD-HHMMSS.md` with:
+   - Date and brief topic
+   - Key decisions made
+   - Action items identified
+   - Any unresolved questions
+2. Update `memory.md` with any new durable knowledge:
+   - Important facts, decisions, preferences, or conclusions
+   - Remove or update anything that has become outdated
+   - Keep it concise — this is a working document, not a log
+
+## Files
+- `memory.md` — persistent project memory (updated each conversation)
+- `history/` — conversation summaries (append-only archive)
+- Other `.md` files — project-specific documents you create or I provide

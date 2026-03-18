@@ -1,7 +1,11 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/aarch64-base:latest
 FROM ${BUILD_FROM}
 
-RUN apk add --no-cache nodejs npm python3 py3-pip jq git curl bash
+RUN apk add --no-cache nodejs npm python3 py3-pip jq git curl bash rclone
+
+# OneDrive MCP server (https://github.com/MrFixit96/onedrive-mcp-server)
+# Provides MCP tools for OneDrive file access via Microsoft Graph API
+RUN pip install --no-cache-dir --break-system-packages onedrive-mcp-server
 
 # Clone Claudegram at build time (always latest)
 RUN git clone --depth 1 https://github.com/NachoSEO/claudegram.git /app/claudegram
