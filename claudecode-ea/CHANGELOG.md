@@ -1,3 +1,6 @@
+## 1.0.7
+- fix(claudecode-ea): use s6-overlay service instead of CMD
+
 ## 1.0.6
 - fix(claudecode-ea): install onedrive-mcp-server from GitHub
 
