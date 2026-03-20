@@ -5,7 +5,7 @@ RUN apk add --no-cache nodejs npm python3 py3-pip jq git curl bash rclone ffmpeg
 
 # OneDrive MCP server (https://github.com/MrFixit96/onedrive-mcp-server)
 # Provides MCP tools for OneDrive file access via Microsoft Graph API
-RUN pip install --no-cache-dir --break-system-packages onedrive-mcp-server yt-dlp
+RUN pip install --no-cache-dir --break-system-packages git+https://github.com/MrFixit96/onedrive-mcp-server.git yt-dlp
 
 # Clone Claudegram at build time (always latest)
 RUN git clone --depth 1 https://github.com/NachoSEO/claudegram.git /app/claudegram
