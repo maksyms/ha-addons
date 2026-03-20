@@ -1,3 +1,6 @@
+## 1.0.8
+- fix(claudecode-ea): set init: false for s6-overlay compatibility
+
 ## 1.0.7
 - fix(claudecode-ea): use s6-overlay service instead of CMD
 
