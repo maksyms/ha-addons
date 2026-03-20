@@ -16,7 +16,7 @@ RUN npm ci --ignore-scripts && npm run build
 # Install Claude Code CLI globally (required by Agent SDK)
 RUN npm install -g @anthropic-ai/claude-code
 
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
-
-CMD ["/run.sh"]
+# Set up s6-overlay service (required for init: true in HA add-ons)
+RUN mkdir -p /etc/services.d/claudegram
+COPY run.sh /etc/services.d/claudegram/run
+RUN chmod +x /etc/services.d/claudegram/run
