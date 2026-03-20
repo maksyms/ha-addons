@@ -8,7 +8,7 @@ url: "https://github.com/maksyms/ha-addons"
 arch:
   - aarch64
   - armv7
-init: true
+init: false
 stdin: true
 startup: application
 boot: auto
