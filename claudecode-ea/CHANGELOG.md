@@ -1,3 +1,6 @@
+## 1.0.6
+- fix(claudecode-ea): install onedrive-mcp-server from GitHub
+
 ## 1.0.5
 - Merge pull request #1 from maksyms/claude/add-dockerfile-dependencies-FArJD
 - Add ffmpeg and yt-dlp dependencies to claudecode-ea Dockerfile
