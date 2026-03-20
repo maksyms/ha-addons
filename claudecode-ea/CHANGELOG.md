@@ -1,3 +1,7 @@
+## 1.0.5
+- Merge pull request #1 from maksyms/claude/add-dockerfile-dependencies-FArJD
+- Add ffmpeg and yt-dlp dependencies to claudecode-ea Dockerfile
+
 ## 1.0.4
 - feat(claudecode-ea): add OneDrive sync, MCP server, project templates
 - docs: update CLAUDE.md for full repo, add personal assistant implementation plan
