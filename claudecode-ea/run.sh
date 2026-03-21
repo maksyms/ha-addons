@@ -62,7 +62,7 @@ if [ -n "$ONEDRIVE_PROJECTS_PATH" ] && [ -n "$RCLONE_CONF" ]; then
                 --update --quiet 2>&1 || true
             # Push local changes back (newer local files overwrite older remote)
             rclone copy "$LOCAL_PROJECTS" "$REMOTE_PATH" --config "$RCLONE_CONF" \
-                --update --quiet 2>&1 || true
+                --update --create-empty-src-dirs --quiet 2>&1 || true
         done
     ) &
 

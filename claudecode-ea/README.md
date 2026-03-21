@@ -32,11 +32,11 @@ Configure via the **Configuration** tab in the HA UI, or place a `.env` file in 
 2. Get your Telegram user ID (e.g. via [@userinfobot](https://t.me/userinfobot))
 3. Set `TELEGRAM_BOT_TOKEN`, `ALLOWED_USER_IDS`, and `ANTHROPIC_API_KEY` in the add-on config
 4. **(Optional)** Set up rclone for OneDrive sync:
-   - On the HA host, run: `docker exec -it addon_<hash>_claudecode-ea rclone config`
-   - Follow the interactive setup to create an `onedrive` remote
-   - The config is saved to `/data/rclone.conf` (persists across restarts)
-   - Alternatively, place a pre-configured `rclone.conf` in `/share/claudecode-ea/`
+   - Install rclone locally: `brew install rclone` / `apt install rclone` / [rclone.org/install](https://rclone.org/install/)
+   - Run `rclone config` → New remote → name it `onedrive` → type `onedrive` → follow the OAuth browser flow
+   - Copy the config to HA: `scp ~/.config/rclone/rclone.conf root@<HA_IP>:/share/claudecode-ea/rclone.conf`
    - Set `ONEDRIVE_PROJECTS_PATH` to the folder you want to sync (e.g. `Documents/AI-Projects`)
+   - Restart the add-on
 5. Start the add-on and message your bot
 
 ## Multi-Project Setup
@@ -67,17 +67,35 @@ When `ONEDRIVE_PROJECTS_PATH` is set, the add-on uses rclone to sync your OneDri
 - Local path is `/share/claudecode-ea/projects`, automatically set as `WORKSPACE_DIR`
 
 **Setup rclone.conf:**
+
+Configure rclone on a local machine (where you have a browser for OAuth), then copy the config to HA:
+
 ```bash
-# SSH into HA host or use Terminal add-on
-docker exec -it addon_<hash>_claudecode-ea rclone config
+# 1. Install rclone locally (if not already installed)
+#    macOS: brew install rclone
+#    Linux: apt install rclone / see https://rclone.org/install/
 
-# Interactive setup:
-# - New remote → "onedrive"
-# - Storage: Microsoft OneDrive
-# - Follow OAuth flow (opens browser)
+# 2. Create the OneDrive remote
+rclone config
+# → n (New remote)
+# → Name: onedrive
+# → Storage: onedrive (Microsoft OneDrive)
+# → client_id: (leave blank)
+# → client_secret: (leave blank)
+# → region: global
+# → Edit advanced config: n
+# → Auto config: y → sign in via browser
+# → Drive type: onedrive (personal)
+# → Confirm the drive shown → y
+
+# 3. Verify it works
+rclone lsd onedrive:YourProjectsFolder
+
+# 4. Copy to HA
+scp ~/.config/rclone/rclone.conf root@<HA_IP>:/share/claudecode-ea/rclone.conf
+
+# 5. Restart the add-on
 ```
-
-Or place a pre-configured `rclone.conf` in `/share/claudecode-ea/`.
 
 ### 2. OneDrive MCP (On-Demand File Access)
 
