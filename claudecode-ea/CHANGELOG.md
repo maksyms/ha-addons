@@ -1,3 +1,6 @@
+## 1.0.9
+- fix(claudecode-ea): sync empty project dirs to OneDrive with rclone
+
 ## 1.0.8
 - fix(claudecode-ea): set init: false for s6-overlay compatibility
 
