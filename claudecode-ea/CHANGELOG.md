@@ -1,3 +1,6 @@
+## 1.0.10
+- feat(claudecode-ea): declarative config for plugins, MCP servers, and settings
+
 ## 1.0.9
 - fix(claudecode-ea): sync empty project dirs to OneDrive with rclone
 
