@@ -25,6 +25,14 @@ A Home Assistant custom add-on repository (`repository.json` at root) containing
 │   ├── config.yaml              # HA add-on manifest (v1.0.2, aarch64+armv7)
 │   ├── Dockerfile               # Alpine + Node.js + Claude Code CLI; clones Claudegram at build
 │   ├── run.sh                   # Three-tier env: /share/.env → /data/.env → options.json
+│   ├── settings.json            # Claude Code default settings (model, effort, etc.)
+│   ├── plugins.txt              # Claude Code plugins to install at build time
+│   ├── mcp.d/                   # MCP server configs (one JSON per server, envsubst at runtime)
+│   │   ├── onedrive.json
+│   │   └── requirements.txt     # pip deps for MCP servers
+│   ├── templates/
+│   │   ├── CLAUDE.md.template
+│   │   └── memory.md.template
 │   ├── CHANGELOG.md
 │   ├── README.md
 │   ├── .env.example
@@ -89,6 +97,23 @@ All via `.env` (see `autoanalyst/.env.example`). `X_BEARER_TOKEN` optional (fxtw
 Wraps upstream [Claudegram](https://github.com/NachoSEO/claudegram) — cloned at Docker build time (`git clone --depth 1`), built with `npm ci && npm run build`, then run as `node /app/claudegram/dist/index.js`.
 
 Claude Code CLI is installed globally (`npm install -g @anthropic-ai/claude-code`) — required by the Agent SDK that Claudegram uses.
+
+### Settings (`settings.json`)
+
+Base Claude Code CLI settings COPYed to `/root/.claude/settings.json` at build time. Currently sets `model` and `effortLevel`. Plugin installs add `enabledPlugins` at build time; MCP merge adds `mcpServers` at runtime. All three layers compose via deep-merge.
+
+### Plugins (`plugins.txt`)
+
+Claude Code plugins are installed at Docker build time. `plugins.txt` declares marketplaces and plugins:
+```
+marketplace kepano/obsidian-skills
+install obsidian@obsidian-skills
+```
+Parsed in Dockerfile via `grep` — `marketplace` lines run `claude plugin marketplace add`, `install` lines run `claude plugin install`.
+
+### MCP Servers (`mcp.d/`)
+
+One JSON file per MCP server. At startup, `run.sh` iterates `mcp.d/*.json`, runs `envsubst` to substitute env vars, skips files with empty values (missing required vars), and deep-merges all into `/root/.claude/settings.json` (preserving `enabledPlugins` from build-time plugin installs). Pip dependencies go in `mcp.d/requirements.txt`.
 
 ### Configuration
 

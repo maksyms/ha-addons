@@ -121,6 +121,55 @@ To sign in, use a web browser to open the page https://microsoft.com/devicelogin
 ```
 Visit the URL, enter the code, and sign in. After that, auth is automatic.
 
+## Claude Code Settings
+
+Default Claude Code CLI settings are in `settings.json` (COPYed to `/root/.claude/settings.json` at build time). Plugins and MCP servers are merged into this file at build and runtime respectively.
+
+```json
+{
+  "model": "opus",
+  "effortLevel": "high"
+}
+```
+
+To change the model or effort level, edit `settings.json` and rebuild.
+
+## Claude Code Plugins
+
+Plugins are installed at Docker build time from `plugins.txt`. Each line is either a `marketplace` or `install` directive:
+
+```
+marketplace kepano/obsidian-skills
+install obsidian@obsidian-skills
+```
+
+To add a new plugin, edit `plugins.txt` and rebuild.
+
+## MCP Servers
+
+MCP server configs live in `mcp.d/`, one JSON file per server. At startup, `run.sh`:
+
+1. Runs `envsubst` on each file to substitute env vars (e.g. `${AZURE_CLIENT_ID}`)
+2. Skips files where any env value is empty (missing required var)
+3. Merges all loaded servers into Claude Code's `settings.json`
+
+**Adding a new MCP server:**
+
+1. Create `mcp.d/myserver.json`:
+   ```json
+   {
+     "myserver": {
+       "command": "myserver-cmd",
+       "args": [],
+       "env": {
+         "MY_API_KEY": "${MY_API_KEY}"
+       }
+     }
+   }
+   ```
+2. If it needs a pip package, add it to `mcp.d/requirements.txt`
+3. Set the required env vars in your `.env`
+
 ## Env File Staging
 
 Place a `.env` file in `/share/claudecode-ea/` on the HA host. On startup, the add-on always prefers this file over the cached `/data/.env`. This is useful when migrating or setting up from a file rather than the UI.

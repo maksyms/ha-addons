@@ -78,28 +78,32 @@ else
     fi
 fi
 
-# ── OneDrive MCP server config ───────────────────────────────────
-if [ "${ONEDRIVE_MCP_ENABLED:-true}" = "true" ] && [ -n "${AZURE_CLIENT_ID:-}" ]; then
-    # Register MCP server in Claude Code user settings
-    mkdir -p /root/.claude
-    cat > /root/.claude/settings.json <<MCPEOF
-{
-  "mcpServers": {
-    "onedrive": {
-      "command": "onedrive-mcp-server",
-      "args": [],
-      "env": {
-        "AZURE_CLIENT_ID": "${AZURE_CLIENT_ID}",
-        "ONEDRIVE_MCP_TOKEN_CACHE": "/data/onedrive-mcp-token-cache.json"
-      }
-    }
-  }
-}
-MCPEOF
-    echo "[mcp] OneDrive MCP server configured (MrFixit96/onedrive-mcp-server)"
-else
-    if [ -z "${AZURE_CLIENT_ID:-}" ]; then
-        echo "[mcp] AZURE_CLIENT_ID not set, skipping OneDrive MCP server"
+# ── MCP servers from mcp.d/ ──────────────────────────────────────
+# Each JSON file defines one MCP server entry. Env vars (${FOO}) are
+# substituted at runtime via envsubst; files with any empty value are skipped.
+SETTINGS=/root/.claude/settings.json
+mkdir -p /root/.claude
+
+MCP_DIR=/app/mcp.d
+if [ -d "$MCP_DIR" ]; then
+    MERGED='{}'
+    for f in "$MCP_DIR"/*.json; do
+        [ -f "$f" ] || continue
+        EXPANDED=$(envsubst < "$f")
+        if echo "$EXPANDED" | jq -e '.. | strings | select(. == "")' >/dev/null 2>&1; then
+            echo "[mcp] Skipping $(basename "$f"): missing required env vars"
+            continue
+        fi
+        MERGED=$(echo "$MERGED" | jq --argjson srv "$EXPANDED" '. * $srv')
+        echo "[mcp] Loaded $(basename "$f")"
+    done
+    if [ "$MERGED" != '{}' ]; then
+        MCP_WRAP=$(echo "$MERGED" | jq '{mcpServers: .}')
+        if [ -f "$SETTINGS" ]; then
+            jq --argjson mcp "$MCP_WRAP" '. * $mcp' "$SETTINGS" > "${SETTINGS}.tmp" && mv "${SETTINGS}.tmp" "$SETTINGS"
+        else
+            echo "$MCP_WRAP" | jq . > "$SETTINGS"
+        fi
     fi
 fi
 

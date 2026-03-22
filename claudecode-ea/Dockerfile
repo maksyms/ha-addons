@@ -1,11 +1,11 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/aarch64-base:latest
 FROM ${BUILD_FROM}
 
-RUN apk add --no-cache nodejs npm python3 py3-pip jq git curl bash rclone ffmpeg
+RUN apk add --no-cache nodejs npm python3 py3-pip jq git curl bash rclone ffmpeg gettext
 
-# OneDrive MCP server (https://github.com/MrFixit96/onedrive-mcp-server)
-# Provides MCP tools for OneDrive file access via Microsoft Graph API
-RUN pip install --no-cache-dir --break-system-packages git+https://github.com/MrFixit96/onedrive-mcp-server.git yt-dlp
+# MCP server configs and their pip dependencies
+COPY mcp.d/ /app/mcp.d/
+RUN pip install --no-cache-dir --break-system-packages -r /app/mcp.d/requirements.txt yt-dlp
 
 # Clone Claudegram at build time (always latest)
 RUN git clone --depth 1 https://github.com/NachoSEO/claudegram.git /app/claudegram
@@ -15,6 +15,14 @@ RUN npm ci --ignore-scripts && npm run build
 
 # Install Claude Code CLI globally (required by Agent SDK)
 RUN npm install -g @anthropic-ai/claude-code
+
+# Claude Code default settings (plugins add enabledPlugins at build, MCP merges at runtime)
+COPY settings.json /root/.claude/settings.json
+
+# Install Claude Code plugins from plugins.txt
+COPY plugins.txt /app/
+RUN grep '^marketplace ' /app/plugins.txt | while read -r _ repo; do claude plugin marketplace add "$repo"; done && \
+    grep '^install ' /app/plugins.txt | while read -r _ plugin; do claude plugin install "$plugin"; done
 
 # Set up s6-overlay service (required for init: true in HA add-ons)
 RUN mkdir -p /etc/services.d/claudegram

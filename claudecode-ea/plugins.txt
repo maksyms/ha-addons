@@ -1,0 +1,6 @@
+# Claude Code plugins to install at build time.
+# Format: "marketplace <github-repo>" or "install <plugin@marketplace>"
+# Marketplaces are added first, then plugins are installed.
+
+marketplace kepano/obsidian-skills
+install obsidian@obsidian-skills

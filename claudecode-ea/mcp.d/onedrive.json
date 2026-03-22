@@ -1,0 +1,10 @@
+{
+  "onedrive": {
+    "command": "onedrive-mcp-server",
+    "args": [],
+    "env": {
+      "AZURE_CLIENT_ID": "${AZURE_CLIENT_ID}",
+      "ONEDRIVE_MCP_TOKEN_CACHE": "/data/onedrive-mcp-token-cache.json"
+    }
+  }
+}
