@@ -27,6 +27,10 @@ fi
 export CLAUDE_CODE_BUBBLEWRAP="${CLAUDE_CODE_BUBBLEWRAP:-1}"
 
 # ── OneDrive rclone sync ─────────────────────────────────────────
+# bisync stores tracking files in $XDG_CACHE_HOME/rclone/bisync/.
+# Point it to /data/ so state survives container restarts.
+export XDG_CACHE_HOME="/data/.cache"
+
 RCLONE_REMOTE="${RCLONE_REMOTE_NAME:-onedrive}"
 RCLONE_CONF="${RCLONE_CONFIG_PATH:-}"
 SYNC_INTERVAL="${RCLONE_SYNC_INTERVAL:-300}"
@@ -44,25 +48,31 @@ fi
 if [ -n "$ONEDRIVE_PROJECTS_PATH" ] && [ -n "$RCLONE_CONF" ]; then
     mkdir -p "$LOCAL_PROJECTS"
     REMOTE_PATH="${RCLONE_REMOTE}:${ONEDRIVE_PROJECTS_PATH}"
+    BISYNC_FLAGS=(--config "$RCLONE_CONF" --create-empty-src-dirs --force)
 
-    # Initial pull — use 'copy --update' (not 'sync') to avoid deleting
-    # locally-created files (history/, memory.md) that haven't been pushed yet.
-    echo "[rclone] Initial pull: ${REMOTE_PATH} -> ${LOCAL_PROJECTS}"
-    rclone copy "$REMOTE_PATH" "$LOCAL_PROJECTS" --config "$RCLONE_CONF" \
-        --update --stats-one-line -v 2>&1 || \
-        echo "[rclone] WARNING: Initial pull failed, continuing anyway"
+    # bisync requires a one-time --resync to establish baseline.
+    # The tracking files are stored in ~/.cache/rclone/bisync/ (persists via /data).
+    BISYNC_MARKER="/data/.rclone-bisync-initialized"
+    if [ ! -f "$BISYNC_MARKER" ]; then
+        echo "[rclone] First run: initializing bisync baseline"
+        rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+            --resync --stats-one-line -v 2>&1 || \
+            echo "[rclone] WARNING: Initial bisync --resync failed, continuing anyway"
+        touch "$BISYNC_MARKER"
+    else
+        echo "[rclone] Initial bisync: ${REMOTE_PATH} <-> ${LOCAL_PROJECTS}"
+        rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+            --stats-one-line -v 2>&1 || \
+            echo "[rclone] WARNING: Initial bisync failed, continuing anyway"
+    fi
 
     # Background bidirectional sync loop.
-    # Uses 'copy --update' both ways: newer files win, nothing is deleted.
+    # bisync propagates creates, updates, AND deletes in both directions.
     (
         while true; do
             sleep "$SYNC_INTERVAL"
-            # Pull remote changes (newer remote files overwrite older local)
-            rclone copy "$REMOTE_PATH" "$LOCAL_PROJECTS" --config "$RCLONE_CONF" \
-                --update --quiet 2>&1 || true
-            # Push local changes back (newer local files overwrite older remote)
-            rclone copy "$LOCAL_PROJECTS" "$REMOTE_PATH" --config "$RCLONE_CONF" \
-                --update --create-empty-src-dirs --quiet 2>&1 || true
+            rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+                --quiet 2>&1 || true
         done
     ) &
 
