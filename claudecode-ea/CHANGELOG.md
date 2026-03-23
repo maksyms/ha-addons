@@ -1,3 +1,6 @@
+## 1.1.1
+- fix(claudecode-ea): switch to fork with session-switch fix
+
 ## 1.0.11
 - feat(claudecode-ea): switch rclone to bisync for bidirectional delete propagation
 
