@@ -16,6 +16,7 @@ map:
   - share:rw
 options:
   TELEGRAM_BOT_TOKEN: ""
+  ALLOWED_USER_IDS: ""
   DANGEROUS_MODE: "false"
   ONEDRIVE_PROJECTS_PATH: ""
   RCLONE_SYNC_INTERVAL: "300"
@@ -23,6 +24,7 @@ options:
   AZURE_CLIENT_ID: ""
 schema:
   TELEGRAM_BOT_TOKEN: str
+  ALLOWED_USER_IDS: str?
   DANGEROUS_MODE: str?
   ONEDRIVE_PROJECTS_PATH: str?
   RCLONE_SYNC_INTERVAL: str?
