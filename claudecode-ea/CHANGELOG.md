@@ -1,3 +1,7 @@
+## 1.1.3
+- feat(claudecode-ea): add incremental text streaming to Telegram
+- docs: add design spec for Telegram text streaming in Claudegram
+
 ## 1.1.2
 - fix(claudecode-ea): auto-resync rclone bisync when listing files are missing
 
