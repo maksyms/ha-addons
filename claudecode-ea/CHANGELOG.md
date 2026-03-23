@@ -1,3 +1,6 @@
+## 1.1.2
+- fix(claudecode-ea): auto-resync rclone bisync when listing files are missing
+
 ## 1.1.1
 - fix(claudecode-ea): switch to fork with session-switch fix
 
