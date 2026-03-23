@@ -22,6 +22,9 @@ COPY plugins.txt /app/
 RUN grep '^marketplace ' /app/plugins.txt | while read -r _ repo; do claude plugin marketplace add "$repo"; done && \
     grep '^install ' /app/plugins.txt | while read -r _ plugin; do claude plugin install "$plugin"; done
 
+# Project templates (root CLAUDE.md, per-project CLAUDE.md, memory.md)
+COPY templates/ /app/templates/
+
 # Set up s6-overlay service
 RUN mkdir -p /etc/services.d/claudecode
 COPY run.sh /etc/services.d/claudecode/run

@@ -51,6 +51,28 @@ if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
     echo "[telegram] Bot token configured"
 fi
 
+# ── Telegram access control ──────────────────────────────────────
+# Pre-seed access.json so allowed users can message immediately
+# without the interactive pairing flow.
+TELEGRAM_DIR=/data/.claude/channels/telegram
+mkdir -p "$TELEGRAM_DIR"
+if [ -n "${ALLOWED_USER_IDS:-}" ]; then
+    IDS_JSON=$(echo "$ALLOWED_USER_IDS" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' | jq -R . | jq -s .)
+    jq -n --argjson ids "$IDS_JSON" '{
+        dmPolicy: "allowlist",
+        allowFrom: $ids,
+        groups: {},
+        mentionPatterns: [],
+        ackReaction: "\ud83d\udc40",
+        replyToMode: "first",
+        textChunkLimit: 4096,
+        chunkMode: "newline"
+    }' > "$TELEGRAM_DIR/access.json"
+    echo "[telegram] Allowlist configured for $(echo "$IDS_JSON" | jq length) user(s)"
+else
+    echo "[telegram] No ALLOWED_USER_IDS — using pairing mode (check logs for code)"
+fi
+
 # ── Claude.ai authentication ───────────────────────────────────
 # Channels require claude.ai login (not API key). On first start, Claude
 # Code will print a device-code URL in the logs — visit it to authenticate.
@@ -147,6 +169,12 @@ else
         echo "[rclone] No rclone.conf found, skipping OneDrive sync"
     fi
     WORK_DIR="/data"
+fi
+
+# ── Seed root CLAUDE.md for multi-project management ────────────
+if [ "$WORK_DIR" != "/data" ] && [ ! -f "$WORK_DIR/CLAUDE.md" ]; then
+    cp /app/templates/root-CLAUDE.md.template "$WORK_DIR/CLAUDE.md"
+    echo "[projects] Seeded root CLAUDE.md in $WORK_DIR"
 fi
 
 # ── MCP servers from mcp.d/ ──────────────────────────────────────
