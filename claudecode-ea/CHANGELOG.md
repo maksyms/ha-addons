@@ -1,3 +1,6 @@
+## 1.0.11
+- feat(claudecode-ea): switch rclone to bisync for bidirectional delete propagation
+
 ## 1.0.10
 - feat(claudecode-ea): declarative config for plugins, MCP servers, and settings
 
