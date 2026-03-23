@@ -61,9 +61,13 @@ if [ -n "$ONEDRIVE_PROJECTS_PATH" ] && [ -n "$RCLONE_CONF" ]; then
         touch "$BISYNC_MARKER"
     else
         echo "[rclone] Initial bisync: ${REMOTE_PATH} <-> ${LOCAL_PROJECTS}"
-        rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
-            --stats-one-line -v 2>&1 || \
-            echo "[rclone] WARNING: Initial bisync failed, continuing anyway"
+        if ! rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+            --stats-one-line -v 2>&1; then
+            echo "[rclone] WARNING: bisync failed — listing files may be missing, retrying with --resync"
+            rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+                --resync --stats-one-line -v 2>&1 || \
+                echo "[rclone] WARNING: bisync --resync also failed, continuing anyway"
+        fi
     fi
 
     # Background bidirectional sync loop.
@@ -71,8 +75,12 @@ if [ -n "$ONEDRIVE_PROJECTS_PATH" ] && [ -n "$RCLONE_CONF" ]; then
     (
         while true; do
             sleep "$SYNC_INTERVAL"
-            rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
-                --quiet 2>&1 || true
+            if ! rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+                --quiet 2>&1; then
+                echo "[rclone] Background bisync failed, retrying with --resync"
+                rclone bisync "$REMOTE_PATH" "$LOCAL_PROJECTS" "${BISYNC_FLAGS[@]}" \
+                    --resync --quiet 2>&1 || true
+            fi
         done
     ) &
 
