@@ -7,8 +7,8 @@ RUN apk add --no-cache nodejs npm python3 py3-pip jq git curl bash rclone ffmpeg
 COPY mcp.d/ /app/mcp.d/
 RUN pip install --no-cache-dir --break-system-packages -r /app/mcp.d/requirements.txt yt-dlp
 
-# Clone Claudegram from fork (includes session-switch fix: NachoSEO/claudegram#26)
-RUN git clone --depth 1 https://github.com/maksyms/claudegram.git -b fix/clear-session-on-project-switch /app/claudegram
+# Clone Claudegram from fork (includes session-switch fix + text streaming)
+RUN git clone --depth 1 https://github.com/maksyms/claudegram.git /app/claudegram
 
 WORKDIR /app/claudegram
 RUN npm ci --ignore-scripts && npm run build
