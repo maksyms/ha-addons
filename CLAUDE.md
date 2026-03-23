@@ -94,7 +94,7 @@ All via `.env` (see `autoanalyst/.env.example`). `X_BEARER_TOKEN` optional (fxtw
 
 ### Architecture
 
-Wraps upstream [Claudegram](https://github.com/NachoSEO/claudegram) — cloned at Docker build time (`git clone --depth 1`), built with `npm ci && npm run build`, then run as `node /app/claudegram/dist/index.js`.
+Wraps [Claudegram](https://github.com/NachoSEO/claudegram) via a [fork](https://github.com/maksyms/claudegram) — cloned at Docker build time (`git clone --depth 1`), built with `npm ci && npm run build`, then run as `node /app/claudegram/dist/index.js`. The fork includes a fix for session ID not being cleared on project switch ([upstream PR #26](https://github.com/NachoSEO/claudegram/pull/26)); switch back to upstream once merged.
 
 Claude Code CLI is installed globally (`npm install -g @anthropic-ai/claude-code`) — required by the Agent SDK that Claudegram uses.
 
