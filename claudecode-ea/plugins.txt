@@ -4,3 +4,7 @@
 
 marketplace kepano/obsidian-skills
 install obsidian@obsidian-skills
+
+# Telegram channel plugin (native Claude Code channels)
+marketplace anthropics/claude-plugins-official
+install telegram@claude-plugins-official
