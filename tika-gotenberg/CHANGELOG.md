@@ -1,3 +1,6 @@
+## 1.0.3
+- fix(tika-gotenberg): install Gotenberg module dependencies
+
 ## 1.0.2
 - fix: add build.json for Debian-based add-ons
 - docs: add MIT LICENSE and update README
