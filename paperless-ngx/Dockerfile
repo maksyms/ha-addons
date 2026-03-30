@@ -4,9 +4,12 @@ FROM ${BUILD_FROM}
 # System dependencies for paperless-ngx
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv python3-dev \
+    build-essential pkg-config \
     redis-server \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus \
-    imagemagick unpaper gnupg libpq5 libmagic1 \
+    imagemagick unpaper gnupg ghostscript qpdf pngquant jbig2dec \
+    libpq-dev libmagic1 libxml2-dev libxslt1-dev \
+    default-libmysqlclient-dev \
     zlib1g-dev libzbar0 poppler-utils \
     jq gettext-base curl xz-utils \
     && rm -rf /var/lib/apt/lists/*
