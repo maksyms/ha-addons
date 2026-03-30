@@ -1,3 +1,6 @@
+## 1.0.5
+- fix(tika-gotenberg): add missing Gotenberg deps and switch to build.yaml
+
 ## 1.0.4
 - fix(tika-gotenberg): export tool paths in run.sh instead of Dockerfile ENV
 
