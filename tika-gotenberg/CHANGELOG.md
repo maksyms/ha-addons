@@ -1,3 +1,6 @@
+## 1.0.4
+- fix(tika-gotenberg): export tool paths in run.sh instead of Dockerfile ENV
+
 ## 1.0.3
 - fix(tika-gotenberg): install Gotenberg module dependencies
 
