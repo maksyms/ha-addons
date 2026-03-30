@@ -1,3 +1,6 @@
+## 1.0.2
+- fix(paperless-ngx): add missing xz-utils for tar.xz extraction
+
 ## 1.0.1
 - fix(tika-gotenberg): add missing Gotenberg deps and switch to build.yaml
 - fix(tika-gotenberg): export tool paths in run.sh instead of Dockerfile ENV
