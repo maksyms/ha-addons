@@ -1,3 +1,7 @@
+## 1.0.2
+- fix: add build.json for Debian-based add-ons
+- docs: add MIT LICENSE and update README
+
 ## 1.0.1
 - Merge master into main to reconcile branches
 - ci(tika-gotenberg): add deploy workflow
