@@ -1,3 +1,6 @@
+## 1.0.4
+- fix(paperless-ngx): correct path to Django app in src/ subdirectory
+
 ## 1.0.3
 - fix(paperless-ngx): add all build deps for pip install
 
