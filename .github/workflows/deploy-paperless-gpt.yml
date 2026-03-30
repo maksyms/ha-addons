@@ -1,0 +1,109 @@
+name: Deploy Paperless-GPT Add-on
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'paperless-gpt/**'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy via SCP + rebuild'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Bump addon version
+        run: |
+          cd paperless-gpt
+          current=$(grep '^version:' config.yaml | sed 's/version: *"\(.*\)"/\1/')
+          IFS='.' read -r major minor patch <<< "$current"
+          new_version="${major}.${minor}.$((patch + 1))"
+          sed -i "s/^version: \"${current}\"/version: \"${new_version}\"/" config.yaml
+          echo "VERSION=${new_version}" >> "$GITHUB_ENV"
+          echo "PREV_VERSION=${current}" >> "$GITHUB_ENV"
+          echo "Bumped version: ${current} → ${new_version}"
+
+      - name: Generate changelog
+        run: |
+          # Find the previous version bump commit to get changes since then
+          PREV_COMMIT=$(git log --oneline --grep="Bump HAOS addon version to ${PREV_VERSION}" --format="%H" -1)
+          if [ -n "$PREV_COMMIT" ]; then
+            CHANGES=$(git log --oneline "${PREV_COMMIT}..HEAD" --no-decorate \
+              | grep -v "\[skip ci\]" \
+              | sed 's/^[a-f0-9]* /- /')
+          else
+            CHANGES=$(git log --oneline -10 --no-decorate \
+              | grep -v "\[skip ci\]" \
+              | sed 's/^[a-f0-9]* /- /')
+          fi
+
+          # Prepend new version entry to CHANGELOG.md
+          CHANGELOG="paperless-gpt/CHANGELOG.md"
+          NEW_ENTRY="## ${VERSION}"$'\n'"${CHANGES}"
+          if [ -f "$CHANGELOG" ]; then
+            echo -e "${NEW_ENTRY}\n\n$(cat "$CHANGELOG")" > "$CHANGELOG"
+          else
+            echo "$NEW_ENTRY" > "$CHANGELOG"
+          fi
+
+      - name: Commit version bump and changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add paperless-gpt/config.yaml paperless-gpt/CHANGELOG.md
+          git commit -m "Bump HAOS addon version to ${VERSION} [skip ci]"
+          git pull --rebase
+          git push
+
+      # --- Force deploy path (SCP + rebuild) ---
+
+      - name: Set up SSH
+        if: github.event_name == 'workflow_dispatch' && inputs.force_deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HA_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.HA_SSH_PORT }} ${{ secrets.HA_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Force deploy to Home Assistant via SCP
+        if: github.event_name == 'workflow_dispatch' && inputs.force_deploy
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.HA_SSH_PORT }} -o StrictHostKeyChecking=accept-new"
+          TARGET="${{ secrets.HA_SSH_USER }}@${{ secrets.HA_SSH_HOST }}"
+          REMOTE_DIR="/addons/paperless-gpt"
+
+          # Ensure remote directory exists
+          $SSH_CMD "$TARGET" "mkdir -p ${REMOTE_DIR}"
+
+          # Upload all add-on files
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.HA_SSH_PORT }} -o StrictHostKeyChecking=accept-new \
+            paperless-gpt/config.yaml \
+            paperless-gpt/Dockerfile \
+            paperless-gpt/build.yaml \
+            paperless-gpt/run.sh \
+            paperless-gpt/CHANGELOG.md \
+            paperless-gpt/README.md \
+            "${TARGET}:${REMOTE_DIR}/"
+
+          echo "Deployed version ${VERSION} to ${TARGET}:${REMOTE_DIR}"
+
+      - name: Rebuild and restart add-on
+        if: github.event_name == 'workflow_dispatch' && inputs.force_deploy
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.HA_SSH_PORT }} -o StrictHostKeyChecking=accept-new"
+          TARGET="${{ secrets.HA_SSH_USER }}@${{ secrets.HA_SSH_HOST }}"
+
+          $SSH_CMD "$TARGET" "ha apps rebuild local_paperless-gpt"
