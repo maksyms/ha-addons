@@ -1,8 +1,8 @@
 name: Claude Code EA
 description: >-
-  Telegram bot powered by Claude Code native channels.
-  Runs Claude Code CLI with the Telegram channel plugin as a Home Assistant add-on.
-version: "1.0.9"
+  Telegram bot bridging to Claude Code via Agent SDK.
+  Wraps Claudegram (NachoSEO/claudegram) as a Home Assistant add-on.
+version: "1.1.3"
 slug: claudecode-ea
 url: "https://github.com/maksyms/ha-addons"
 arch:
@@ -17,15 +17,21 @@ map:
 options:
   TELEGRAM_BOT_TOKEN: ""
   ALLOWED_USER_IDS: ""
+  ANTHROPIC_API_KEY: ""
   DANGEROUS_MODE: "false"
+  STREAMING_MODE: "streaming"
+  BOT_NAME: ""
   ONEDRIVE_PROJECTS_PATH: ""
   RCLONE_SYNC_INTERVAL: "300"
   ONEDRIVE_MCP_ENABLED: "true"
   AZURE_CLIENT_ID: ""
 schema:
   TELEGRAM_BOT_TOKEN: str
-  ALLOWED_USER_IDS: str?
+  ALLOWED_USER_IDS: str
+  ANTHROPIC_API_KEY: str
   DANGEROUS_MODE: str?
+  STREAMING_MODE: str?
+  BOT_NAME: str?
   ONEDRIVE_PROJECTS_PATH: str?
   RCLONE_SYNC_INTERVAL: str?
   ONEDRIVE_MCP_ENABLED: str?

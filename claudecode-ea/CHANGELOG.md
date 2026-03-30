@@ -1,3 +1,19 @@
+## 1.1.3
+- feat(claudecode-ea): add incremental text streaming to Telegram
+- docs: add design spec for Telegram text streaming in Claudegram
+
+## 1.1.2
+- fix(claudecode-ea): auto-resync rclone bisync when listing files are missing
+
+## 1.1.1
+- fix(claudecode-ea): switch to fork with session-switch fix
+
+## 1.0.11
+- feat(claudecode-ea): switch rclone to bisync for bidirectional delete propagation
+
+## 1.0.10
+- feat(claudecode-ea): declarative config for plugins, MCP servers, and settings
+
 ## 1.0.9
 - fix(claudecode-ea): sync empty project dirs to OneDrive with rclone
 
