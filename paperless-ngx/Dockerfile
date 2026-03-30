@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus \
     imagemagick unpaper gnupg libpq5 libmagic1 \
     zlib1g-dev libzbar0 poppler-utils \
-    jq gettext-base curl \
+    jq gettext-base curl xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install paperless-ngx from official release
