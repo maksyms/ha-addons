@@ -21,14 +21,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=gotenberg/gotenberg:8 /usr/bin/gotenberg /usr/bin/gotenberg
 COPY --from=gotenberg/gotenberg:8 /usr/bin/pdfcpu /usr/bin/pdfcpu
 
-# Gotenberg needs to know where its tools live
-ENV CHROMIUM_BIN_PATH=/usr/bin/chromium
-ENV LIBREOFFICE_BIN_PATH=/usr/bin/libreoffice
-ENV EXIFTOOL_BIN_PATH=/usr/bin/exiftool
-ENV PDFTK_BIN_PATH=/usr/bin/pdftk
-ENV QPDF_BIN_PATH=/usr/bin/qpdf
-ENV PDFCPU_BIN_PATH=/usr/bin/pdfcpu
-
 # Download Tika server JAR
 RUN curl -fsSL "https://archive.apache.org/dist/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar" \
     -o /usr/bin/tika-server-standard.jar
