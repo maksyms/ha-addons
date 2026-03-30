@@ -13,7 +13,7 @@ A Home Assistant custom add-on repository.
 
 ### [Auto Analyst](autoanalyst/)
 
-Monitors a Telegram 1-2-1 chat for tweet links, fetches the content, runs it through an LLM for critical analysis, and posts the result back. Uses Telethon (MTProto) to access private chats that the Bot API cannot reach.
+Monitors a Telegram chat for tweet links, fetches content, sends it for critical analysis, and posts the result back.
 
 - Two-tier tweet fetching (X API v2 + fxtwitter fallback)
 - Video transcription via OpenAI Whisper
@@ -21,27 +21,36 @@ Monitors a Telegram 1-2-1 chat for tweet links, fetches the content, runs it thr
 
 ### [Claude Code EA](claudecode-ea/)
 
-Telegram bot bridging to Claude Code via the Agent SDK. Wraps [Claudegram](https://github.com/NachoSEO/claudegram) — cloned at build time so each rebuild gets the latest upstream.
+Telegram bot bridging to Claude Code via the Agent SDK. Wraps [Claudegram](https://github.com/NachoSEO/claudegram) as a Home Assistant add-on.
 
 - AI-powered executive assistant over Telegram
 - Streaming responses
 - Optional dangerous mode for arbitrary command execution
 
-## Repository Structure
+### [Paperless-ngx](paperless-ngx/)
 
-```
-├── repository.json          # HA add-on repository metadata
-├── autoanalyst/             # Auto Analyst add-on
-│   ├── config.yaml
-│   ├── Dockerfile
-│   ├── run.sh
-│   └── autoanalyst.py
-├── claudecode-ea/           # Claude Code EA add-on
-│   ├── config.yaml
-│   ├── Dockerfile
-│   └── run.sh
-```
+Document management system that transforms physical documents into a searchable online archive.
+
+- Full-text search and tagging
+- Automatic document classification
+- Web UI with ingress support
+
+### [Paperless-GPT](paperless-gpt/)
+
+AI-powered document organizer for Paperless-ngx. Generates titles, tags, correspondents, and dates using LLMs.
+
+- Supports OpenAI, Anthropic, Ollama, Google AI, and Mistral
+- Manual and fully automatic processing modes
+- LLM-enhanced OCR support
+
+### [Tika & Gotenberg](tika-gotenberg/)
+
+Apache Tika and Gotenberg services for document text extraction. Companion to Paperless-ngx.
+
+- Apache Tika for content extraction
+- Gotenberg for PDF conversion
+- Shared infrastructure for document processing
 
 ## License
 
-Private / unlicensed.
+MIT
