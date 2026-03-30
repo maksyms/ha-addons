@@ -1,0 +1,37 @@
+name: Paperless-ngx
+description: >-
+  Document management system that transforms physical documents
+  into a searchable online archive.
+version: "1.0.0"
+slug: paperless-ngx
+url: "https://github.com/maksyms/ha-addons"
+arch:
+  - aarch64
+  - armv7
+init: false
+stdin: true
+startup: application
+boot: auto
+map:
+  - share:rw
+  - addon_config:rw
+ports:
+  8000/tcp: 8000
+ports_description:
+  8000/tcp: Paperless-ngx web UI
+options:
+  PAPERLESS_ADMIN_USER: "admin"
+  PAPERLESS_ADMIN_PASSWORD: ""
+  PAPERLESS_OCR_LANGUAGE: "eng+rus"
+  PAPERLESS_TIME_ZONE: ""
+  TIKA_GOTENBERG_ENABLED: "false"
+  TIKA_ENDPOINT: "http://localhost:9998"
+  GOTENBERG_ENDPOINT: "http://localhost:3000"
+schema:
+  PAPERLESS_ADMIN_USER: str
+  PAPERLESS_ADMIN_PASSWORD: str
+  PAPERLESS_OCR_LANGUAGE: str?
+  PAPERLESS_TIME_ZONE: str?
+  TIKA_GOTENBERG_ENABLED: str?
+  TIKA_ENDPOINT: str?
+  GOTENBERG_ENDPOINT: str?
