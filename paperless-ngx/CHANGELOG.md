@@ -1,3 +1,11 @@
+## 1.0.1
+- fix(tika-gotenberg): add missing Gotenberg deps and switch to build.yaml
+- fix(tika-gotenberg): export tool paths in run.sh instead of Dockerfile ENV
+- fix(tika-gotenberg): install Gotenberg module dependencies
+- fix: add build.json for Debian-based add-ons
+- docs: add MIT LICENSE and update README
+- feat(paperless-gpt): add HA add-on wrapping icereed/paperless-gpt
+
 ## 1.0.0
 - Initial release
 - Paperless-ngx v2.20.10
