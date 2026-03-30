@@ -4,7 +4,9 @@ set -euo pipefail
 # Gotenberg needs to know where its module tools live
 # (HA s6-overlay strips Dockerfile ENV vars, so set them here)
 export CHROMIUM_BIN_PATH=/usr/bin/chromium
-export LIBREOFFICE_BIN_PATH=/usr/bin/libreoffice
+export CHROMIUM_HYPHEN_DATA_DIR_PATH=/opt/gotenberg/chromium-hyphen-data
+export LIBREOFFICE_BIN_PATH=/usr/lib/libreoffice/program/soffice.bin
+export UNOCONVERTER_BIN_PATH=/usr/bin/unoconverter
 export EXIFTOOL_BIN_PATH=/usr/bin/exiftool
 export PDFTK_BIN_PATH=/usr/bin/pdftk
 export QPDF_BIN_PATH=/usr/bin/qpdf
