@@ -47,7 +47,7 @@ redis-server /etc/redis/redis.conf --daemonize yes
 echo "Redis started."
 
 # --- Database migrations ---
-cd /usr/src/paperless-ngx
+cd /usr/src/paperless-ngx/src
 python3 manage.py migrate --noinput
 echo "Database migrations complete."
 

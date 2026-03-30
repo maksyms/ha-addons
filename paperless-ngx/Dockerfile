@@ -20,6 +20,7 @@ RUN curl -fsSL "https://github.com/paperless-ngx/paperless-ngx/releases/download
     | tar -xJ -C /usr/src/ \
     && cd /usr/src/paperless-ngx \
     && pip install --no-cache-dir --break-system-packages -r requirements.txt \
+    && cd /usr/src/paperless-ngx/src \
     && python3 manage.py collectstatic --noinput
 
 # NLTK data for document classification
