@@ -1,3 +1,6 @@
+## 1.0.3
+- fix(paperless-ngx): add all build deps for pip install
+
 ## 1.0.2
 - fix(paperless-ngx): add missing xz-utils for tar.xz extraction
 
