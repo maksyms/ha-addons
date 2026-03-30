@@ -13,7 +13,7 @@ Add a paperless-ngx add-on to the ha-addons repository, following the same patte
 - **Architectures:** aarch64 + armv7 (matching existing add-ons)
 - **Database:** SQLite by default, optional external PostgreSQL via `paperless.conf`
 - **No ingress:** Direct port mapping (8000). User adds to HA sidebar via `panel_iframe` if desired.
-- **Minimal HA UI options:** Admin credentials, OCR language, timezone. Everything else via `paperless.conf`.
+- **Minimal HA UI options:** Admin credentials, OCR language, timezone, Tika/Gotenberg toggle + endpoints. Everything else via `paperless.conf`.
 - **Redis:** Bundled in-container, started as background daemon by `run.sh`
 - **Paperless version:** Pinned via Dockerfile `ARG` (initially v2.20.10)
 - **Images:** icon.png and logo.png sourced from reference repo (BenoitAnastay/paperless-home-assistant-addon)
@@ -65,11 +65,17 @@ options:
   PAPERLESS_ADMIN_PASSWORD: ""
   PAPERLESS_OCR_LANGUAGE: "eng+rus"
   PAPERLESS_TIME_ZONE: ""
+  TIKA_GOTENBERG_ENABLED: "false"
+  TIKA_ENDPOINT: "http://localhost:9998"
+  GOTENBERG_ENDPOINT: "http://localhost:3000"
 schema:
   PAPERLESS_ADMIN_USER: str
   PAPERLESS_ADMIN_PASSWORD: str
   PAPERLESS_OCR_LANGUAGE: str?
   PAPERLESS_TIME_ZONE: str?
+  TIKA_GOTENBERG_ENABLED: str?
+  TIKA_ENDPOINT: str?
+  GOTENBERG_ENDPOINT: str?
 ```
 
 ## Dockerfile
@@ -177,6 +183,14 @@ if [ -n "${PAPERLESS_ADMIN_USER:-}" ] && [ -n "${PAPERLESS_ADMIN_PASSWORD:-}" ];
     echo "Admin user ensured."
 fi
 
+# --- Tika/Gotenberg integration ---
+if [ "${TIKA_GOTENBERG_ENABLED:-false}" = "true" ]; then
+    export PAPERLESS_TIKA_ENABLED="1"
+    export PAPERLESS_TIKA_ENDPOINT="${TIKA_ENDPOINT:-http://localhost:9998}"
+    export PAPERLESS_TIKA_GOTENBERG_ENDPOINT="${GOTENBERG_ENDPOINT:-http://localhost:3000}"
+    echo "Tika/Gotenberg enabled: tika=${PAPERLESS_TIKA_ENDPOINT}, gotenberg=${PAPERLESS_TIKA_GOTENBERG_ENDPOINT}"
+fi
+
 # --- Start Celery worker + beat in background ---
 celery -A paperless worker --loglevel=info &
 celery -A paperless beat --loglevel=info &
@@ -196,6 +210,7 @@ exec granian --interface asgi \
 - Redis as background daemon, Celery worker+beat backgrounded, web server in foreground
 - Migrations run every startup (idempotent, standard practice)
 - `manage_superuser` is paperless's built-in command to create/update admin
+- Tika/Gotenberg: when toggle is `true`, sets `PAPERLESS_TIKA_ENABLED`, `PAPERLESS_TIKA_ENDPOINT`, and `PAPERLESS_TIKA_GOTENBERG_ENDPOINT`. Expects Tika and Gotenberg running as separate HA add-ons; user provides the endpoints (defaults: `localhost:9998` and `localhost:3000`)
 
 ## redis.conf
 
@@ -217,6 +232,10 @@ PAPERLESS_ADMIN_USER=admin
 PAPERLESS_ADMIN_PASSWORD=changeme
 PAPERLESS_OCR_LANGUAGE=eng+rus
 PAPERLESS_TIME_ZONE=Europe/London
+# Tika/Gotenberg (requires separate HA add-ons for Tika and Gotenberg)
+TIKA_GOTENBERG_ENABLED=false
+TIKA_ENDPOINT=http://localhost:9998
+GOTENBERG_ENDPOINT=http://localhost:3000
 # Advanced: any PAPERLESS_* var works. See:
 # https://docs.paperless-ngx.com/configuration/
 ```
@@ -249,7 +268,7 @@ Same pattern as `deploy-autoanalyst.yml` and `deploy-claudecode-ea.yml`:
 - No s6-overlay service tree (simple background processes instead)
 - No SSL termination (use HA's built-in proxy or external reverse proxy)
 - No HA API integration for CSRF auto-discovery
-- No Tika/Gotenberg toggle (can be configured via `paperless.conf`)
+- Tika/Gotenberg toggle included (expects separate HA add-ons for Tika and Gotenberg services)
 - No UID/GID mapping (can be configured via `paperless.conf`)
 - No locale installation (Russian + English tesseract baked in)
 - No amd64 support
