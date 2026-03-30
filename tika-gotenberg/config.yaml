@@ -1,0 +1,19 @@
+name: Tika-Gotenberg
+description: >-
+  Apache Tika and Gotenberg services for document
+  text extraction. Companion to Paperless-ngx.
+version: "1.0.0"
+slug: tika-gotenberg
+url: "https://github.com/maksyms/ha-addons"
+arch:
+  - aarch64
+init: false
+stdin: true
+startup: system
+boot: auto
+ports:
+  3000/tcp: null
+  9998/tcp: null
+ports_description:
+  3000/tcp: Gotenberg
+  9998/tcp: Tika
