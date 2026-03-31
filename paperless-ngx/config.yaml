@@ -12,6 +12,7 @@ init: false
 stdin: true
 startup: application
 boot: auto
+webui: "http://[HOST]:[PORT:8000]"
 map:
   - share:rw
   - addon_config:rw
