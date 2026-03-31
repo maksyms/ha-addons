@@ -1,3 +1,7 @@
+## 1.0.6
+- feat(paperless-ngx): add webui button to addon info page
+- docs: add design spec for paperless-ngx sidebar link
+
 ## 1.0.5
 - fix(paperless-ngx): unset empty PAPERLESS_TIME_ZONE to prevent Django crash
 
