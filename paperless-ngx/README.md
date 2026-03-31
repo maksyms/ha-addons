@@ -25,7 +25,7 @@ After installing the add-on, configure it via the **Configuration** tab in the H
 
 ### Advanced Configuration
 
-Create `/addon_configs/paperless_ngx/paperless.conf` with any `PAPERLESS_*` environment variables. This file is sourced on startup after the HA UI options, so it can override or extend them.
+Create `/addon_configs/paperless-ngx/paperless.conf` with any `PAPERLESS_*` environment variables. This file is sourced on startup after the HA UI options, so it can override or extend them.
 
 See the [paperless-ngx configuration docs](https://docs.paperless-ngx.com/configuration/) for all available options.
 
@@ -68,8 +68,8 @@ panel_iframe:
 
 | Path | Contents |
 |------|----------|
-| `/addon_configs/paperless_ngx/data` | SQLite DB, search index |
-| `/addon_configs/paperless_ngx/paperless.conf` | Advanced config |
+| `/data/paperless-ngx` | SQLite DB, search index, classification model |
+| `/addon_configs/paperless-ngx/paperless.conf` | Advanced config |
 | `/share/paperless/media` | Stored documents |
 | `/share/paperless/consume` | Consumption inbox |
 

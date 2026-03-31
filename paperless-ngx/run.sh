@@ -23,8 +23,8 @@ else
 fi
 
 # --- Advanced config from paperless.conf ---
-# Users can put any PAPERLESS_* setting here
-CONF="/addon_configs/paperless_ngx/paperless.conf"
+# Users can put any PAPERLESS_* setting here (addon_config slug uses hyphen)
+CONF="/addon_configs/paperless-ngx/paperless.conf"
 if [ -f "$CONF" ]; then
     set -a
     source "$CONF"
@@ -32,7 +32,9 @@ if [ -f "$CONF" ]; then
 fi
 
 # --- Directories ---
-export PAPERLESS_DATA_DIR="/addon_configs/paperless_ngx/data"
+# /data/ is HA's always-persistent add-on storage (survives rebuilds/updates)
+# /share/ is shared across add-ons (documents accessible from host)
+export PAPERLESS_DATA_DIR="/data/paperless-ngx"
 export PAPERLESS_MEDIA_ROOT="/share/paperless/media"
 export PAPERLESS_CONSUMPTION_DIR="/share/paperless/consume"
 mkdir -p "$PAPERLESS_DATA_DIR" "$PAPERLESS_MEDIA_ROOT" "$PAPERLESS_CONSUMPTION_DIR"
