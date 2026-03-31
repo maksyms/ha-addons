@@ -1,3 +1,6 @@
+## 1.0.5
+- fix(paperless-ngx): unset empty PAPERLESS_TIME_ZONE to prevent Django crash
+
 ## 1.0.4
 - fix(paperless-ngx): correct path to Django app in src/ subdirectory
 
