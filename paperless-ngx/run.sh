@@ -37,6 +37,10 @@ export PAPERLESS_MEDIA_ROOT="/share/paperless/media"
 export PAPERLESS_CONSUMPTION_DIR="/share/paperless/consume"
 mkdir -p "$PAPERLESS_DATA_DIR" "$PAPERLESS_MEDIA_ROOT" "$PAPERLESS_CONSUMPTION_DIR"
 
+# --- Unset empty optional vars so paperless-ngx uses its defaults ---
+[ -z "${PAPERLESS_TIME_ZONE:-}" ] && unset PAPERLESS_TIME_ZONE
+[ -z "${PAPERLESS_OCR_LANGUAGE:-}" ] && unset PAPERLESS_OCR_LANGUAGE
+
 # --- Defaults ---
 export PAPERLESS_REDIS="redis://localhost:6379"
 export PAPERLESS_PORT="${PAPERLESS_PORT:-8000}"
