@@ -1,3 +1,6 @@
+## 1.0.7
+- fix(paperless-ngx): persist database across rebuilds by moving data to /data/
+
 ## 1.0.6
 - feat(paperless-ngx): add webui button to addon info page
 - docs: add design spec for paperless-ngx sidebar link
