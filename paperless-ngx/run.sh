@@ -76,6 +76,13 @@ celery -A paperless worker --loglevel=info &
 celery -A paperless beat --loglevel=info &
 echo "Celery worker and scheduler started."
 
+# --- Start document consumer in background ---
+# Watches PAPERLESS_CONSUMPTION_DIR for new files and triggers consume tasks.
+# Use polling because inotify does not work reliably on Docker bind mounts.
+export PAPERLESS_CONSUMER_POLLING=1
+python3 manage.py document_consumer &
+echo "Document consumer started (polling mode)."
+
 # --- Start web server (foreground) ---
 exec granian --interface asgi \
     --host "$PAPERLESS_BIND_ADDR" \
