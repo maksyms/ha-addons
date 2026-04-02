@@ -1,3 +1,6 @@
+## 1.0.8
+- fix(paperless-ngx): start document_consumer to process files in consume dir
+
 ## 1.0.7
 - fix(paperless-ngx): persist database across rebuilds by moving data to /data/
 
