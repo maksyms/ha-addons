@@ -1,3 +1,14 @@
+## 1.0.3
+- feat(paperless-ngx): enable native HA ingress for sidebar entry
+- fix(paperless-ngx): allow embedding in HA sidebar iframe
+- fix(paperless-ngx): start document_consumer to process files in consume dir
+- fix(paperless-ngx): persist database across rebuilds by moving data to /data/
+- feat(paperless-ngx): add webui button to addon info page
+- docs: add design spec for paperless-ngx sidebar link
+- fix(paperless-ngx): unset empty PAPERLESS_TIME_ZONE to prevent Django crash
+- fix(paperless-ngx): correct path to Django app in src/ subdirectory
+- fix(paperless-ngx): add all build deps for pip install
+
 ## 1.0.2
 - fix(paperless-ngx): allow embedding in HA sidebar iframe
 - fix(paperless-ngx): start document_consumer to process files in consume dir
