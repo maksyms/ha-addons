@@ -83,6 +83,9 @@ export PAPERLESS_CONSUMER_POLLING=1
 python3 manage.py document_consumer &
 echo "Document consumer started (polling mode)."
 
+# --- Allow embedding in HA iframe (Paperless hardcodes SAMEORIGIN) ---
+sed -i 's/^X_FRAME_OPTIONS = .*/X_FRAME_OPTIONS = "ALLOWALL"/' /usr/src/paperless-ngx/src/paperless/settings.py
+
 # --- Start web server (foreground) ---
 exec granian --interface asgi \
     --host "$PAPERLESS_BIND_ADDR" \

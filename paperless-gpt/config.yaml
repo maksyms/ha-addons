@@ -22,7 +22,7 @@ map:
   - addon_config:rw
   - share:rw
 options:
-  paperless_base_url: "http://local-paperless-ngx:8000"
+  paperless_base_url: "http://23930cf1-paperless-ngx:8000"
   paperless_api_token: ""
   paperless_manual_tag: "paperless-gpt"
   paperless_auto_tag: "paperless-gpt-auto"
