@@ -2,7 +2,7 @@ name: Paperless-ngx
 description: >-
   Document management system that transforms physical documents
   into a searchable online archive.
-version: "1.0.8"
+version: "1.0.14"
 slug: paperless-ngx
 url: "https://github.com/maksyms/ha-addons"
 arch:
@@ -12,7 +12,10 @@ init: false
 stdin: true
 startup: application
 boot: auto
-webui: "http://[HOST]:[PORT:8000]"
+ingress: true
+ingress_port: 8000
+hassio_api: true
+panel_icon: mdi:file-document-multiple
 map:
   - share:rw
   - addon_config:rw

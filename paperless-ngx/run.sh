@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/command/with-contenv bash
 set -euo pipefail
 
 # --- Environment loading (same priority as other add-ons) ---
@@ -48,6 +48,21 @@ export PAPERLESS_REDIS="redis://localhost:6379"
 export PAPERLESS_PORT="${PAPERLESS_PORT:-8000}"
 export PAPERLESS_BIND_ADDR="${PAPERLESS_BIND_ADDR:-0.0.0.0}"
 
+# --- Ingress subpath support ---
+# HA ingress serves the addon under /api/hassio_ingress/<token>/
+# Paperless-ngx needs FORCE_SCRIPT_NAME to generate correct URLs
+if [ -n "${SUPERVISOR_TOKEN:-}" ]; then
+    INGRESS_ENTRY=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        http://supervisor/addons/self/info | jq -r '.data.ingress_entry // empty')
+    if [ -n "$INGRESS_ENTRY" ]; then
+        export PAPERLESS_FORCE_SCRIPT_NAME="$INGRESS_ENTRY"
+        echo "Ingress path: $INGRESS_ENTRY"
+    fi
+fi
+# HA ingress proxy sets X-Forwarded-Host — Django uses it for CSRF validation
+export PAPERLESS_USE_X_FORWARD_HOST=true
+export PAPERLESS_USE_X_FORWARD_PORT=true
+
 # --- Start Redis in background ---
 redis-server /etc/redis/redis.conf --daemonize yes
 echo "Redis started."
@@ -82,9 +97,6 @@ echo "Celery worker and scheduler started."
 export PAPERLESS_CONSUMER_POLLING=1
 python3 manage.py document_consumer &
 echo "Document consumer started (polling mode)."
-
-# --- Allow embedding in HA iframe (Paperless hardcodes SAMEORIGIN) ---
-sed -i 's/^X_FRAME_OPTIONS = .*/X_FRAME_OPTIONS = "ALLOWALL"/' /usr/src/paperless-ngx/src/paperless/settings.py
 
 # --- Start web server (foreground) ---
 exec granian --interface asgi \

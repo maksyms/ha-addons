@@ -1,3 +1,21 @@
+## 1.0.14
+- fix(paperless-ngx): use with-contenv shebang for SUPERVISOR_TOKEN access
+
+## 1.0.13
+- debug(paperless-ngx): add SUPERVISOR_TOKEN and INGRESS_ENTRY logging
+
+## 1.0.12
+- fix(paperless-ngx): enable hassio_api for ingress FORCE_SCRIPT_NAME
+
+## 1.0.11
+- fix(paperless-ngx): re-expose port 8000 on host for debugging
+
+## 1.0.10
+- feat(paperless-ngx): enable native HA ingress for sidebar entry
+
+## 1.0.9
+- fix(paperless-ngx): allow embedding in HA sidebar iframe
+
 ## 1.0.8
 - fix(paperless-ngx): start document_consumer to process files in consume dir
 
