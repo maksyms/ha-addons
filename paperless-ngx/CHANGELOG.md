@@ -1,3 +1,11 @@
+## 1.0.15
+- feat(paperless-ngx): enable native HA ingress for sidebar entry
+- fix(paperless-ngx): allow embedding in HA sidebar iframe
+- fix(paperless-ngx): start document_consumer to process files in consume dir
+- fix(paperless-ngx): persist database across rebuilds by moving data to /data/
+- feat(paperless-ngx): add webui button to addon info page
+- docs: add design spec for paperless-ngx sidebar link
+
 ## 1.0.14
 - fix(paperless-ngx): use with-contenv shebang for SUPERVISOR_TOKEN access
 
