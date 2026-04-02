@@ -1,3 +1,6 @@
+## 1.0.4
+- feat(paperless-gpt): switch to Anthropic Sonnet 4.6, fix startup DNS, expose more config
+
 ## 1.0.3
 - feat(paperless-ngx): enable native HA ingress for sidebar entry
 - fix(paperless-ngx): allow embedding in HA sidebar iframe
