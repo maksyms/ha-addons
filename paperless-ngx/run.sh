@@ -93,10 +93,13 @@ echo "Celery worker and scheduler started."
 
 # --- OneDrive rclone one-way sync to consume folder ---
 # Copies new files from OneDrive to PAPERLESS_CONSUMPTION_DIR.
-# Source files are never deleted; sync is one-way (remote → local).
+# Each file is copied exactly once — tracked in a state file so files
+# deleted by paperless after consumption are never re-downloaded.
+# Source files on OneDrive are never deleted.
 RCLONE_REMOTE="${RCLONE_REMOTE_NAME:-onedrive}"
 RCLONE_CONF="${RCLONE_CONFIG_PATH:-}"
 SYNC_INTERVAL="${RCLONE_SYNC_INTERVAL:-300}"
+RCLONE_SEEN="${RCLONE_SEEN_FILE:-/data/rclone_seen.txt}"
 
 # Find rclone config
 if [ -z "$RCLONE_CONF" ]; then
@@ -107,21 +110,39 @@ if [ -z "$RCLONE_CONF" ]; then
     fi
 fi
 
+# Copy only files not yet seen (tracked in RCLONE_SEEN state file).
+rclone_copy_new() {
+    local remote_path="$1" dest="$2" conf="$3" verbose="${4:-}"
+    touch "$RCLONE_SEEN"
+    local count=0
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        if ! grep -qxF "$file" "$RCLONE_SEEN"; then
+            if rclone copy "${remote_path}${file}" "$dest" \
+                    --config "$conf" $verbose 2>&1; then
+                echo "$file" >> "$RCLONE_SEEN"
+                count=$((count + 1))
+            else
+                echo "[rclone] WARNING: Failed to copy $file"
+            fi
+        fi
+    done < <(rclone lsf "$remote_path" --config "$conf" --recursive 2>&1)
+    echo "[rclone] Copied $count new file(s)"
+}
+
 if [ -n "${RCLONE_SCANNER_PATH:-}" ] && [ -n "$RCLONE_CONF" ]; then
-    REMOTE_PATH="${RCLONE_REMOTE}:${RCLONE_SCANNER_PATH}"
+    REMOTE_PATH="${RCLONE_REMOTE}:${RCLONE_SCANNER_PATH}/"
 
-    echo "[rclone] Initial copy: ${REMOTE_PATH} -> ${PAPERLESS_CONSUMPTION_DIR}"
-    rclone copy "$REMOTE_PATH" "$PAPERLESS_CONSUMPTION_DIR" \
-        --config "$RCLONE_CONF" --stats-one-line -v 2>&1 || \
-        echo "[rclone] WARNING: Initial copy failed, continuing anyway"
+    echo "[rclone] Initial sync: ${REMOTE_PATH} -> ${PAPERLESS_CONSUMPTION_DIR}"
+    rclone_copy_new "$REMOTE_PATH" "$PAPERLESS_CONSUMPTION_DIR" "$RCLONE_CONF" "--stats-one-line -v" || \
+        echo "[rclone] WARNING: Initial sync failed, continuing anyway"
 
-    # Background one-way sync loop
+    # Background sync loop
     (
         while true; do
             sleep "$SYNC_INTERVAL"
-            rclone copy "$REMOTE_PATH" "$PAPERLESS_CONSUMPTION_DIR" \
-                --config "$RCLONE_CONF" --quiet 2>&1 || \
-                echo "[rclone] WARNING: Background copy failed"
+            rclone_copy_new "$REMOTE_PATH" "$PAPERLESS_CONSUMPTION_DIR" "$RCLONE_CONF" "--quiet" || \
+                echo "[rclone] WARNING: Background sync failed"
         done
     ) &
     echo "[rclone] Background sync every ${SYNC_INTERVAL}s"
