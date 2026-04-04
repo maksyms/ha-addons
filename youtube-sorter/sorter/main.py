@@ -309,9 +309,7 @@ def run_sort(config: Config, db: Database) -> dict:
                     stats["videos_reordered"] += len(desired_order)
                     logger.info(f"Reordered playlist {playlist_id}: {len(desired_order)} videos")
                 except NotImplementedError:
-                    # reorder_playlist is not fully implemented yet
-                    stats["videos_reordered"] += len(desired_order)
-                    logger.warning(f"Reordering not implemented, but would reorder {len(desired_order)} videos")
+                    logger.warning(f"Reorder not yet implemented — {len(desired_order)} videos in {playlist_id} need reordering")
                 except Exception as e:
                     error_msg = f"Failed to reorder playlist {playlist_id}: {e}"
                     logger.error(error_msg)
