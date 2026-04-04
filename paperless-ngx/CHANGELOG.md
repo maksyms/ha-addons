@@ -1,3 +1,8 @@
+## 1.0.16
+- feat(paperless-ngx): add duplicate deletion and OneDrive scanner sync
+- docs: add design spec for youtube-sorter add-on
+- feat(paperless-gpt): switch to Anthropic Sonnet 4.6, fix startup DNS, expose more config
+
 ## 1.0.15
 - feat(paperless-ngx): enable native HA ingress for sidebar entry
 - fix(paperless-ngx): allow embedding in HA sidebar iframe
