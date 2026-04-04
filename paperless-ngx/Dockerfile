@@ -11,8 +11,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev libmagic1 libxml2-dev libxslt1-dev \
     default-libmysqlclient-dev \
     zlib1g-dev libzbar0 poppler-utils \
-    jq gettext-base curl xz-utils rclone \
+    jq gettext-base curl xz-utils unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install latest rclone (Debian Bookworm's v1.60.1-DEV leaks Authorization
+# headers on cross-domain redirects, breaking OneDrive file downloads)
+RUN ARCH="$(dpkg --print-architecture)" && \
+    case "$ARCH" in \
+        amd64) RCLONE_ARCH="amd64" ;; \
+        arm64) RCLONE_ARCH="arm64" ;; \
+        armhf) RCLONE_ARCH="arm-v7" ;; \
+        *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -fsSL "https://downloads.rclone.org/rclone-current-linux-${RCLONE_ARCH}.zip" -o /tmp/rclone.zip && \
+    unzip -j /tmp/rclone.zip '*/rclone' -d /usr/local/bin/ && \
+    chmod +x /usr/local/bin/rclone && \
+    rm /tmp/rclone.zip
 
 # Download and install paperless-ngx from official release
 ARG PAPERLESS_VERSION=2.20.10

@@ -2,7 +2,7 @@ name: YouTube Sorter
 description: >-
   Manages YouTube playlists: removes watched videos, classifies
   remaining by category using AI, reorders by priority and date.
-version: "1.0.0"
+version: "1.0.1"
 slug: youtube-sorter
 url: "https://github.com/maksyms/ha-addons"
 arch:
