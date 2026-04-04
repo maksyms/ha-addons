@@ -13,7 +13,7 @@ export QPDF_BIN_PATH=/usr/bin/qpdf
 export PDFCPU_BIN_PATH=/usr/bin/pdfcpu
 
 # Start Gotenberg (background)
-gotenberg --api-port=3000 --api-timeout=60s --log-level=info &
+gotenberg --api-port=3000 --api-timeout=60s --log-level=info --api-disable-metrics &
 echo "Gotenberg started on port 3000."
 
 # Start Tika (background)
