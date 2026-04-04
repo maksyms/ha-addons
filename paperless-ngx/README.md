@@ -52,6 +52,45 @@ TIKA_ENDPOINT=http://your-tika-host:9998
 GOTENBERG_ENDPOINT=http://your-gotenberg-host:3000
 ```
 
+## Duplicate Handling
+
+By default, the consumer deletes files from the consume folder if they are duplicates of already-ingested documents (`PAPERLESS_CONSUMER_DELETE_DUPLICATES=true`). This prevents re-ingestion when files are synced repeatedly. Override via `.env` or `paperless.conf` if needed.
+
+## OneDrive Scanner Sync
+
+One-way sync from an OneDrive folder (e.g. your scanner's output) into the consume folder using rclone. Files are copied to paperless but never deleted from OneDrive.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `RCLONE_SCANNER_PATH` | Yes | — | OneDrive folder path (e.g. `Documents/Scans`) |
+| `RCLONE_REMOTE_NAME` | No | `onedrive` | rclone remote name |
+| `RCLONE_SYNC_INTERVAL` | No | `300` | Sync interval in seconds |
+| `RCLONE_CONFIG_PATH` | No | auto | Path to rclone.conf (auto-detected from `/share/paperless/` or `/data/`) |
+
+### Setup
+
+If you already have rclone configured for another add-on (e.g. claudecode-ea), copy the existing config:
+
+```bash
+cp /share/claudecode-ea/rclone.conf /share/paperless/rclone.conf
+```
+
+Otherwise, set up rclone on a machine with a browser (OAuth flow requires it):
+
+```bash
+# 1. Install rclone
+brew install rclone  # or: apt install rclone
+
+# 2. Configure OneDrive remote
+rclone config
+# → New remote → name: onedrive → type: onedrive → follow OAuth flow
+
+# 3. Copy config to HA
+scp ~/.config/rclone/rclone.conf root@<HA_IP>:/share/paperless/rclone.conf
+```
+
+Then set `RCLONE_SCANNER_PATH` in your `.env` and restart the add-on.
+
 ## Adding to HA Sidebar
 
 Since this add-on uses direct port mapping (no ingress), add it to the HA sidebar via `configuration.yaml`:

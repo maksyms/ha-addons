@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev libmagic1 libxml2-dev libxslt1-dev \
     default-libmysqlclient-dev \
     zlib1g-dev libzbar0 poppler-utils \
-    jq gettext-base curl xz-utils \
+    jq gettext-base curl xz-utils rclone \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install paperless-ngx from official release

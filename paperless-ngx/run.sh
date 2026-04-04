@@ -91,10 +91,55 @@ celery -A paperless worker --loglevel=info &
 celery -A paperless beat --loglevel=info &
 echo "Celery worker and scheduler started."
 
+# --- OneDrive rclone one-way sync to consume folder ---
+# Copies new files from OneDrive to PAPERLESS_CONSUMPTION_DIR.
+# Source files are never deleted; sync is one-way (remote → local).
+RCLONE_REMOTE="${RCLONE_REMOTE_NAME:-onedrive}"
+RCLONE_CONF="${RCLONE_CONFIG_PATH:-}"
+SYNC_INTERVAL="${RCLONE_SYNC_INTERVAL:-300}"
+
+# Find rclone config
+if [ -z "$RCLONE_CONF" ]; then
+    if [ -f /share/paperless/rclone.conf ]; then
+        RCLONE_CONF=/share/paperless/rclone.conf
+    elif [ -f /data/rclone.conf ]; then
+        RCLONE_CONF=/data/rclone.conf
+    fi
+fi
+
+if [ -n "${RCLONE_SCANNER_PATH:-}" ] && [ -n "$RCLONE_CONF" ]; then
+    REMOTE_PATH="${RCLONE_REMOTE}:${RCLONE_SCANNER_PATH}"
+
+    echo "[rclone] Initial copy: ${REMOTE_PATH} -> ${PAPERLESS_CONSUMPTION_DIR}"
+    rclone copy "$REMOTE_PATH" "$PAPERLESS_CONSUMPTION_DIR" \
+        --config "$RCLONE_CONF" --stats-one-line -v 2>&1 || \
+        echo "[rclone] WARNING: Initial copy failed, continuing anyway"
+
+    # Background one-way sync loop
+    (
+        while true; do
+            sleep "$SYNC_INTERVAL"
+            rclone copy "$REMOTE_PATH" "$PAPERLESS_CONSUMPTION_DIR" \
+                --config "$RCLONE_CONF" --quiet 2>&1 || \
+                echo "[rclone] WARNING: Background copy failed"
+        done
+    ) &
+    echo "[rclone] Background sync every ${SYNC_INTERVAL}s"
+else
+    if [ -z "${RCLONE_SCANNER_PATH:-}" ]; then
+        echo "[rclone] RCLONE_SCANNER_PATH not set, skipping OneDrive sync"
+    fi
+    if [ -z "$RCLONE_CONF" ]; then
+        echo "[rclone] No rclone.conf found, skipping OneDrive sync"
+    fi
+fi
+
 # --- Start document consumer in background ---
 # Watches PAPERLESS_CONSUMPTION_DIR for new files and triggers consume tasks.
 # Use polling because inotify does not work reliably on Docker bind mounts.
 export PAPERLESS_CONSUMER_POLLING=1
+# Delete files from consume folder if they are duplicates of already-ingested documents.
+export PAPERLESS_CONSUMER_DELETE_DUPLICATES="${PAPERLESS_CONSUMER_DELETE_DUPLICATES:-true}"
 python3 manage.py document_consumer &
 echo "Document consumer started (polling mode)."
 
