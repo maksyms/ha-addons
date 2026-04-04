@@ -1,3 +1,7 @@
+## 1.0.21
+- fix(paperless-ngx): copy-once rclone sync to avoid re-downloading consumed files
+- fix(tika-gotenberg): disable OTLP metrics to stop log spam
+
 ## 1.0.20
 - fix(paperless-ngx): install latest rclone, fix OneDrive downloads
 - fix(youtube-sorter): fix HTML entities in config.yaml, fix reorder stats
