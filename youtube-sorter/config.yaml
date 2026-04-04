@@ -1,0 +1,51 @@
+name: YouTube Sorter
+description: >-
+  Manages YouTube playlists: removes watched videos, classifies
+  remaining by category using AI, reorders by priority and date.
+version: "1.0.0"
+slug: youtube-sorter
+url: "https://github.com/maksyms/ha-addons"
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 5000
+panel_icon: mdi:youtube
+map:
+  - share:rw
+options:
+  youtube_cookies: "/share/youtube-sorter/cookies.txt"
+  playlist_ids:
+    - ""
+  anthropic_api_key: ""
+  categories:
+    - "Claude &amp; AI"
+    - "Investing &amp; Wealth"
+    - "Health &amp; Biohacking"
+    - "Men's Fashion"
+    - "Sailing &amp; Outdoors"
+    - "History &amp; Geopolitics"
+    - "Software Engineering"
+    - "Science"
+    - "Relationships"
+    - "Other"
+  schedule_cron: "0 */6 * * *"
+  date_sort_field: "date_added"
+  date_sort_order: "desc"
+  watch_threshold: 90
+  create_sublists: false
+schema:
+  youtube_cookies: str?
+  playlist_ids:
+    - str
+  anthropic_api_key: str
+  categories:
+    - str
+  schedule_cron: str?
+  date_sort_field: str?
+  date_sort_order: str?
+  watch_threshold: int?
+  create_sublists: bool?
