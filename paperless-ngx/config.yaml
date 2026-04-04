@@ -2,7 +2,7 @@ name: Paperless-ngx
 description: >-
   Document management system that transforms physical documents
   into a searchable online archive.
-version: "1.0.19"
+version: "1.0.20"
 slug: paperless-ngx
 url: "https://github.com/maksyms/ha-addons"
 arch:
