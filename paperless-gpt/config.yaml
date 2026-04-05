@@ -2,7 +2,7 @@ name: Paperless-GPT
 description: >-
   AI-powered document organizer for Paperless-ngx.
   Generates titles, tags, correspondents, and dates using LLMs.
-version: "1.0.5"
+version: "1.0.6"
 slug: paperless-gpt
 url: "https://github.com/maksyms/ha-addons"
 arch:
