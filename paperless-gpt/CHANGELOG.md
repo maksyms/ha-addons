@@ -1,3 +1,6 @@
+## 1.0.7
+- fix(paperless-gpt): cap pixel dimension to 7680 and lower file limit to 2.9MB
+
 ## 1.0.6
 - fix(paperless-gpt): lower image limit to 3.9MB to account for base64 encoding overhead
 
