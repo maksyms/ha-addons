@@ -86,6 +86,13 @@ if [ "${TIKA_GOTENBERG_ENABLED:-false}" = "true" ]; then
     echo "Tika/Gotenberg enabled: tika=${PAPERLESS_TIKA_ENDPOINT}, gotenberg=${PAPERLESS_TIKA_GOTENBERG_ENDPOINT}"
 fi
 
+# --- Consumer settings (must be set before Celery starts, since the worker
+#     reads Django settings at import time) ---
+# Use polling because inotify does not work reliably on Docker bind mounts.
+export PAPERLESS_CONSUMER_POLLING=1
+# Delete files from consume folder if they are duplicates of already-ingested documents.
+export PAPERLESS_CONSUMER_DELETE_DUPLICATES="${PAPERLESS_CONSUMER_DELETE_DUPLICATES:-true}"
+
 # --- Start Celery worker + beat in background ---
 celery -A paperless worker --loglevel=info &
 celery -A paperless beat --loglevel=info &
@@ -167,10 +174,6 @@ fi
 
 # --- Start document consumer in background ---
 # Watches PAPERLESS_CONSUMPTION_DIR for new files and triggers consume tasks.
-# Use polling because inotify does not work reliably on Docker bind mounts.
-export PAPERLESS_CONSUMER_POLLING=1
-# Delete files from consume folder if they are duplicates of already-ingested documents.
-export PAPERLESS_CONSUMER_DELETE_DUPLICATES="${PAPERLESS_CONSUMER_DELETE_DUPLICATES:-true}"
 python3 manage.py document_consumer &
 echo "Document consumer started (polling mode)."
 
