@@ -1,3 +1,26 @@
+## 1.0.5
+- fix(paperless-gpt): cap image size to 4.8MB to stay under Anthropic 5MB API limit
+- fix(paperless-ngx): move consumer env vars before Celery worker starts
+- fix(tika-gotenberg): disable OTLP exporters to stop metric upload errors
+- fix(paperless-ngx): use single rclone copy with --files-from instead of per-file loop
+- fix(paperless-ngx): fix rclone lsf stderr polluting file list
+- fix(tika-gotenberg): use correct flag to disable Prometheus metrics
+- fix(paperless-ngx): copy-once rclone sync to avoid re-downloading consumed files
+- fix(tika-gotenberg): disable OTLP metrics to stop log spam
+- fix(paperless-ngx): install latest rclone, fix OneDrive downloads
+- fix(youtube-sorter): fix HTML entities in config.yaml, fix reorder stats
+- ci(youtube-sorter): add deploy workflow
+- feat(youtube-sorter): add web UI with Dracula theme
+- feat(youtube-sorter): add orchestrator with scheduling
+- feat(youtube-sorter): add AI classifier with batching
+- feat(youtube-sorter): add innertube client for playlist mutations
+- feat(youtube-sorter): add YouTube read layer with yt-dlp
+- feat(youtube-sorter): add database layer with tests
+- feat(youtube-sorter): scaffold add-on structure
+- docs: add implementation plan for youtube-sorter add-on
+- feat(paperless-ngx): add duplicate deletion and OneDrive scanner sync
+- docs: add design spec for youtube-sorter add-on
+
 ## 1.0.4
 - feat(paperless-gpt): switch to Anthropic Sonnet 4.6, fix startup DNS, expose more config
 
