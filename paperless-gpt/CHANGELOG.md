@@ -1,3 +1,6 @@
+## 1.0.8
+- fix(paperless-gpt): lower image file limit to 2.5MB for upstream resize bug headroom
+
 ## 1.0.7
 - fix(paperless-gpt): cap pixel dimension to 7680 and lower file limit to 2.9MB
 
