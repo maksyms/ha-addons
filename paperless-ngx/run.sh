@@ -119,14 +119,14 @@ rclone_copy_new() {
         [ -z "$file" ] && continue
         if ! grep -qxF "$file" "$RCLONE_SEEN"; then
             if rclone copy "${remote_path}${file}" "$dest" \
-                    --config "$conf" $verbose 2>&1; then
+                    --config "$conf" $verbose; then
                 echo "$file" >> "$RCLONE_SEEN"
                 count=$((count + 1))
             else
                 echo "[rclone] WARNING: Failed to copy $file"
             fi
         fi
-    done < <(rclone lsf "$remote_path" --config "$conf" --recursive 2>&1)
+    done < <(rclone lsf "$remote_path" --config "$conf" --recursive 2>/dev/null)
     echo "[rclone] Copied $count new file(s)"
 }
 
