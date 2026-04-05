@@ -1,3 +1,7 @@
+## 1.0.22
+- fix(paperless-ngx): fix rclone lsf stderr polluting file list
+- fix(tika-gotenberg): use correct flag to disable Prometheus metrics
+
 ## 1.0.21
 - fix(paperless-ngx): copy-once rclone sync to avoid re-downloading consumed files
 - fix(tika-gotenberg): disable OTLP metrics to stop log spam
