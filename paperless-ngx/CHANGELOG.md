@@ -1,3 +1,7 @@
+## 1.0.24
+- fix(paperless-ngx): move consumer env vars before Celery worker starts
+- fix(tika-gotenberg): disable OTLP exporters to stop metric upload errors
+
 ## 1.0.23
 - fix(paperless-ngx): use single rclone copy with --files-from instead of per-file loop
 
