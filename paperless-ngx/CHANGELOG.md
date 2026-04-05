@@ -1,3 +1,6 @@
+## 1.0.23
+- fix(paperless-ngx): use single rclone copy with --files-from instead of per-file loop
+
 ## 1.0.22
 - fix(paperless-ngx): fix rclone lsf stderr polluting file list
 - fix(tika-gotenberg): use correct flag to disable Prometheus metrics
