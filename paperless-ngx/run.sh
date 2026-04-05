@@ -112,22 +112,32 @@ fi
 
 # Copy only files not yet seen (tracked in RCLONE_SEEN state file).
 rclone_copy_new() {
-    local remote_path="$1" dest="$2" conf="$3" verbose="${4:-}"
+    local remote_path="$1" dest="$2" conf="$3" log_level="${4:---quiet}"
     touch "$RCLONE_SEEN"
-    local count=0
-    while IFS= read -r file; do
-        [ -z "$file" ] && continue
-        if ! grep -qxF "$file" "$RCLONE_SEEN"; then
-            if rclone copy "${remote_path}${file}" "$dest" \
-                    --config "$conf" $verbose; then
-                echo "$file" >> "$RCLONE_SEEN"
-                count=$((count + 1))
-            else
-                echo "[rclone] WARNING: Failed to copy $file"
-            fi
-        fi
-    done < <(rclone lsf "$remote_path" --config "$conf" --recursive 2>/dev/null)
-    echo "[rclone] Copied $count new file(s)"
+
+    # List remote files, diff against seen file to find new ones
+    local tmplist="/tmp/rclone_new_files.txt"
+    rclone lsf "$remote_path" --config "$conf" --recursive 2>/dev/null \
+        | grep -vxFf "$RCLONE_SEEN" > "$tmplist" || true
+
+    local count
+    count=$(wc -l < "$tmplist" | tr -d ' ')
+    if [ "$count" -eq 0 ]; then
+        echo "[rclone] No new files"
+        rm -f "$tmplist"
+        return 0
+    fi
+
+    echo "[rclone] Copying $count new file(s)..."
+    if rclone copy "$remote_path" "$dest" \
+            --config "$conf" --files-from "$tmplist" \
+            $log_level; then
+        cat "$tmplist" >> "$RCLONE_SEEN"
+        echo "[rclone] Copied $count new file(s)"
+    else
+        echo "[rclone] WARNING: Copy failed, will retry next cycle"
+    fi
+    rm -f "$tmplist"
 }
 
 if [ -n "${RCLONE_SCANNER_PATH:-}" ] && [ -n "$RCLONE_CONF" ]; then
