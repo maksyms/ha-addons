@@ -8,6 +8,7 @@ A Home Assistant custom add-on repository (`repository.json` at root) containing
 
 1. **autoanalyst/** — Telegram userbot that monitors a private chat for tweet links, fetches content, sends it to Claude for critical analysis, and posts back. Uses Telethon (MTProto).
 2. **claudecode-ea/** — Telegram bot bridging to Claude Code via Agent SDK. Wraps [Claudegram](https://github.com/NachoSEO/claudegram) as an HA add-on.
+3. **paperless-gpt/** — HA add-on wrapping [icereed/paperless-gpt](https://github.com/icereed/paperless-gpt). AI-powered document organizer for Paperless-ngx (titles, tags, correspondents, dates via LLM vision OCR).
 
 ## Repository Structure
 
@@ -38,9 +39,15 @@ A Home Assistant custom add-on repository (`repository.json` at root) containing
 │   ├── .env.example
 │   ├── icon.png
 │   └── logo.png
+├── paperless-gpt/               # Paperless-ngx AI organizer add-on
+│   ├── config.yaml              # HA add-on manifest (aarch64+amd64)
+│   ├── Dockerfile               # Wraps icereed/paperless-gpt:latest
+│   ├── run.sh                   # options.json → env vars, waits for paperless-ngx
+│   └── CHANGELOG.md
 └── .github/workflows/
     ├── deploy-autoanalyst.yml   # CI/CD for autoanalyst
-    └── deploy-claudecode-ea.yml # CI/CD for claudecode-ea
+    ├── deploy-claudecode-ea.yml # CI/CD for claudecode-ea
+    └── deploy-paperless-gpt.yml # CI/CD for paperless-gpt
 ```
 
 ## CI/CD
@@ -139,3 +146,28 @@ Six options configurable via HA UI or `/share/claudecode-ea/.env`:
 - `init: false`, `stdin: true` in config.yaml
 - Only aarch64 + armv7 (no amd64)
 - Claudegram is always latest upstream at build time
+
+---
+
+## paperless-gpt
+
+### Architecture
+
+Thin HA add-on wrapper around `icereed/paperless-gpt:latest`. Dockerfile adds bash/jq/curl, copies `run.sh` which converts HA `options.json` keys to `UPPER_SNAKE_CASE` env vars, waits for paperless-ngx to be reachable, then execs the upstream binary.
+
+### Anthropic Vision API Limits
+
+Two hard limits when sending page images via base64:
+1. **5MB on the base64-encoded string** (5,242,880 bytes) — base64 has 4/3 overhead, so max raw JPEG ≈ 3.75MB
+2. **8000 pixels max per dimension** — upstream default is 10,000
+
+### Upstream Resize Bug ([icereed/paperless-gpt#946](https://github.com/icereed/paperless-gpt/pull/946))
+
+The image compression pipeline's resize fallback re-encodes at `jpeg.DefaultQuality` (75) instead of the last quality from the reduction loop (60), inflating output ~1.36× above `IMAGE_MAX_FILE_BYTES`. Current config works around this with conservative limits:
+
+```yaml
+image_max_pixel_dimension: 7680   # under 8000px Anthropic limit
+image_max_file_bytes: 2500000     # 2.5MB × 1.36 bug inflate = 3.4MB → base64 4.5MB < 5MB
+```
+
+**When #946 merges:** raise `image_max_file_bytes` to ~3,800,000. Keep `image_max_pixel_dimension: 7680`.
