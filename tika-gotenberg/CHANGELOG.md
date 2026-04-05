@@ -1,3 +1,8 @@
+## 1.0.8
+- fix(tika-gotenberg): disable OTLP exporters to stop metric upload errors
+- fix(paperless-ngx): use single rclone copy with --files-from instead of per-file loop
+- fix(paperless-ngx): fix rclone lsf stderr polluting file list
+
 ## 1.0.7
 - fix(tika-gotenberg): use correct flag to disable Prometheus metrics
 - fix(paperless-ngx): copy-once rclone sync to avoid re-downloading consumed files
