@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Gotenberg needs to know where its module tools live
-# (HA s6-overlay strips Dockerfile ENV vars, so set them here)
+# The official Gotenberg image sets ENV vars that HA s6-overlay strips,
+# so we must re-export them here.
+
+# Disable OpenTelemetry exporters (no OTLP collector running)
+# Without these, autoexport defaults to "otlp" and spams connection errors to localhost:4318
+export OTEL_TRACES_EXPORTER=none
+export OTEL_METRICS_EXPORTER=none
+export OTEL_LOGS_EXPORTER=none
+
+# Gotenberg module tool paths
 export CHROMIUM_BIN_PATH=/usr/bin/chromium
 export CHROMIUM_HYPHEN_DATA_DIR_PATH=/opt/gotenberg/chromium-hyphen-data
 export LIBREOFFICE_BIN_PATH=/usr/lib/libreoffice/program/soffice.bin
