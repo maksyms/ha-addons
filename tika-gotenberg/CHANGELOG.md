@@ -1,3 +1,7 @@
+## 1.0.7
+- fix(tika-gotenberg): use correct flag to disable Prometheus metrics
+- fix(paperless-ngx): copy-once rclone sync to avoid re-downloading consumed files
+
 ## 1.0.6
 - fix(tika-gotenberg): disable OTLP metrics to stop log spam
 - fix(paperless-ngx): install latest rclone, fix OneDrive downloads
