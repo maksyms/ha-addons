@@ -1,3 +1,6 @@
+## 1.0.10
+- fix(tika-gotenberg): add python3-uno for unoconverter LibreOffice bindings
+
 ## 1.0.9
 - fix(tika-gotenberg): add python3-setuptools for unoconverter distutils compat
 - fix(paperless-ngx): load options.json before .env so UI settings always apply
