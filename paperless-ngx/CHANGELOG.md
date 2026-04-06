@@ -1,3 +1,10 @@
+## 1.0.25
+- fix(paperless-ngx): load options.json before .env so UI settings always apply
+- fix(paperless-gpt): lower image file limit to 2.5MB for upstream resize bug headroom
+- fix(paperless-gpt): cap pixel dimension to 7680 and lower file limit to 2.9MB
+- fix(paperless-gpt): lower image limit to 3.9MB to account for base64 encoding overhead
+- fix(paperless-gpt): cap image size to 4.8MB to stay under Anthropic 5MB API limit
+
 ## 1.0.24
 - fix(paperless-ngx): move consumer env vars before Celery worker starts
 - fix(tika-gotenberg): disable OTLP exporters to stop metric upload errors
