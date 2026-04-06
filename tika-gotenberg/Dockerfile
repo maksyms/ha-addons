@@ -7,7 +7,7 @@ ARG TIKA_VERSION=3.1.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     curl \
-    python3 \
+    python3 python3-setuptools \
     # Gotenberg module dependencies
     chromium \
     libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress \
