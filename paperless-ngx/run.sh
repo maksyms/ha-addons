@@ -1,25 +1,25 @@
 #!/command/with-contenv bash
 set -euo pipefail
 
-# --- Environment loading (same priority as other add-ons) ---
-# 1. /share/paperless/.env (staging area)
-# 2. /data/.env (persisted from previous run)
-# 3. Generated from /data/options.json (HA UI)
+# --- Environment loading ---
+# options.json (HA UI) provides the base, then .env files override on top.
+# This way UI settings always apply, even when .env exists for extras like rclone.
 
+# 1. Load options.json as base (skip empty values so paperless-ngx uses defaults)
+CONFIG=/data/options.json
+for key in $(jq -r 'keys[]' "$CONFIG"); do
+    value=$(jq -r --arg k "$key" '.[$k]' "$CONFIG")
+    [ -n "$value" ] && export "$key=$value"
+done
+
+# 2. .env overrides (staging area → persisted copy)
 if [ -f /share/paperless/.env ]; then
     cp /share/paperless/.env /data/.env
 fi
-
 if [ -f /data/.env ]; then
     set -a
     source /data/.env
     set +a
-else
-    CONFIG=/data/options.json
-    for key in $(jq -r 'keys[]' "$CONFIG"); do
-        value=$(jq -r --arg k "$key" '.[$k]' "$CONFIG")
-        export "$key=$value"
-    done
 fi
 
 # --- Advanced config from paperless.conf ---
