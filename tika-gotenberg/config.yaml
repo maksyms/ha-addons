@@ -2,7 +2,7 @@ name: Tika-Gotenberg
 description: >-
   Apache Tika and Gotenberg services for document
   text extraction. Companion to Paperless-ngx.
-version: "1.0.8"
+version: "1.0.9"
 slug: tika-gotenberg
 url: "https://github.com/maksyms/ha-addons"
 arch:

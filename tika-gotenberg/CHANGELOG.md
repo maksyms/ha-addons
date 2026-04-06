@@ -1,3 +1,7 @@
+## 1.0.9
+- fix(tika-gotenberg): add python3-setuptools for unoconverter distutils compat
+- fix(paperless-ngx): load options.json before .env so UI settings always apply
+
 ## 1.0.8
 - fix(tika-gotenberg): disable OTLP exporters to stop metric upload errors
 - fix(paperless-ngx): use single rclone copy with --files-from instead of per-file loop
