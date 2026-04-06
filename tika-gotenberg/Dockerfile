@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Gotenberg module dependencies
     chromium \
     libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress \
+    python3-uno \
     libimage-exiftool-perl \
     pdftk-java \
     qpdf \
