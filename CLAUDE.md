@@ -198,10 +198,10 @@ Two processes in one container:
 
 Caddy (separate HA add-on or host service) reverse-proxies to port 8081 for TLS and internet access. No HA ingress. Atomic runs at `/` with no base-path handling needed.
 
-Caddyfile:
+Caddyfile (Caddy runs in its own container, so use the atomic container hostname, not localhost):
 ```
 atomic.example.com {
-    reverse_proxy localhost:8081
+    reverse_proxy 23930cf1-atomic:8081
 }
 ```
 
