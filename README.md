@@ -60,6 +60,14 @@ Personal knowledge base powered by Atomic Server. Linked data, real-time collabo
 - OAuth authentication
 - Caddy reverse proxy for TLS
 
+### [Atomic Ingest](atomic-ingest/)
+
+Automated data ingestion into Atomic knowledge base. Cron-based Python add-on that syncs from multiple sources.
+
+- Readwise highlights and Reader articles
+- Raindrop.io bookmarks and uploads
+- Evernote `.enex` file import
+
 ## License
 
 MIT
