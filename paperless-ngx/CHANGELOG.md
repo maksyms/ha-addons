@@ -1,3 +1,8 @@
+## 1.0.26
+- fix(paperless-ngx): respect user-set FORCE_SCRIPT_NAME over ingress path
+- fix(tika-gotenberg): add python3-uno for unoconverter LibreOffice bindings
+- fix(tika-gotenberg): add python3-setuptools for unoconverter distutils compat
+
 ## 1.0.25
 - fix(paperless-ngx): load options.json before .env so UI settings always apply
 - fix(paperless-gpt): lower image file limit to 2.5MB for upstream resize bug headroom
