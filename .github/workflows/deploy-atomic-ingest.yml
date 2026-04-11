@@ -1,0 +1,60 @@
+name: Deploy Atomic Ingest Add-on
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'atomic-ingest/**'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Bump addon version
+        run: |
+          cd atomic-ingest
+          current=$(grep '^version:' config.yaml | sed 's/version: *"\(.*\)"/\1/')
+          IFS='.' read -r major minor patch <<< "$current"
+          new_version="${major}.${minor}.$((patch + 1))"
+          sed -i "s/^version: \"${current}\"/version: \"${new_version}\"/" config.yaml
+          echo "VERSION=${new_version}" >> "$GITHUB_ENV"
+          echo "PREV_VERSION=${current}" >> "$GITHUB_ENV"
+          echo "Bumped version: ${current} → ${new_version}"
+
+      - name: Generate changelog
+        run: |
+          PREV_COMMIT=$(git log --oneline --grep="Bump HAOS addon version to ${PREV_VERSION}" --format="%H" -1)
+          if [ -n "$PREV_COMMIT" ]; then
+            CHANGES=$(git log --oneline "${PREV_COMMIT}..HEAD" --no-decorate \
+              | grep -v "\[skip ci\]" \
+              | sed 's/^[a-f0-9]* /- /')
+          else
+            CHANGES=$(git log --oneline -10 --no-decorate \
+              | grep -v "\[skip ci\]" \
+              | sed 's/^[a-f0-9]* /- /')
+          fi
+
+          CHANGELOG="atomic-ingest/CHANGELOG.md"
+          NEW_ENTRY="## ${VERSION}"$'\n'"${CHANGES}"
+          if [ -f "$CHANGELOG" ]; then
+            echo -e "${NEW_ENTRY}\n\n$(cat "$CHANGELOG")" > "$CHANGELOG"
+          else
+            echo "$NEW_ENTRY" > "$CHANGELOG"
+          fi
+
+      - name: Commit version bump and changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add atomic-ingest/config.yaml atomic-ingest/CHANGELOG.md
+          git commit -m "Bump HAOS addon version to ${VERSION} [skip ci]"
+          git pull --rebase
+          git push

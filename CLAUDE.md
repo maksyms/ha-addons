@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Home Assistant custom add-on repository (`repository.json` at root) containing two add-ons:
+A Home Assistant custom add-on repository (`repository.json` at root) containing five add-ons:
 
 1. **autoanalyst/** — Telegram userbot that monitors a private chat for tweet links, fetches content, sends it to Claude for critical analysis, and posts back. Uses Telethon (MTProto).
 2. **claudecode-ea/** — Telegram bot bridging to Claude Code via Agent SDK. Wraps [Claudegram](https://github.com/NachoSEO/claudegram) as an HA add-on.
 3. **paperless-gpt/** — HA add-on wrapping [icereed/paperless-gpt](https://github.com/icereed/paperless-gpt). AI-powered document organizer for Paperless-ngx (titles, tags, correspondents, dates via LLM vision OCR).
 4. **atomic/** — HA add-on wrapping [kenforthewin/atomic](https://github.com/kenforthewin/atomic). Personal knowledge base with linked data, real-time collaboration, MCP endpoint for AI tools, and OAuth auth. Uses pre-built upstream Docker images.
+5. **atomic-ingest/** — Cron-based Python add-on that ingests data from multiple sources (Readwise, Raindrop, Evernote) into Atomic via its REST API.
 
 ## Repository Structure
 
@@ -50,22 +51,38 @@ A Home Assistant custom add-on repository (`repository.json` at root) containing
 │   ├── Dockerfile               # COPY --from upstream ghcr.io image
 │   ├── run.sh                   # reads options.json, starts atomic-server + nginx
 │   └── CHANGELOG.md
+├── atomic-ingest/               # Atomic data ingestion add-on
+│   ├── config.yaml              # HA add-on manifest (aarch64)
+│   ├── Dockerfile               # python:3.12-slim + cron
+│   ├── run.sh                   # env setup, crontab gen, exec crond
+│   ├── requirements.txt
+│   ├── lib/                     # Shared modules
+│   │   ├── atomic_client.py
+│   │   ├── sync_state.py
+│   │   └── folder_consumer.py
+│   ├── adapters/                # Source-specific ingestion scripts
+│   │   ├── readwise.py
+│   │   ├── raindrop.py
+│   │   └── evernote.py
+│   ├── tests/
+│   └── .env.example
 └── .github/workflows/
     ├── deploy-autoanalyst.yml   # CI/CD for autoanalyst
     ├── deploy-claudecode-ea.yml # CI/CD for claudecode-ea
-    └── deploy-paperless-gpt.yml # CI/CD for paperless-gpt
+    ├── deploy-paperless-gpt.yml # CI/CD for paperless-gpt
+    └── deploy-atomic.yml        # CI/CD for atomic
 ```
 
 ## CI/CD
 
-Each add-on has a separate deploy workflow triggered by pushes to `master` with path filters. Both workflows:
+Each add-on has a separate deploy workflow triggered by pushes to `master` with path filters. All workflows:
 - Auto-bump patch version in `config.yaml`
 - Generate changelog from git log since last version bump
 - Commit with `[skip ci]` to avoid loops
 
 `deploy-claudecode-ea.yml` also supports `workflow_dispatch` with a `force_deploy` option that SCPs files to the HA host and runs `ha apps rebuild`.
 
-`deploy-atomic.yml` follows the same pattern: push-triggered, path-filtered, auto version bump + changelog.
+`deploy-atomic.yml` and `deploy-atomic-ingest.yml` follow the same pattern: push-triggered, path-filtered, auto version bump + changelog.
 
 ---
 
@@ -220,4 +237,53 @@ All data persists in `/data/` (HA-managed volume):
 
 ### Integration
 
-`atomic-ingest` (companion add-on, future) accesses Atomic's API on the internal HA Docker network. API tokens created manually via Atomic's web UI.
+`atomic-ingest` (companion add-on) accesses Atomic's API on the internal HA Docker network. API tokens created manually via Atomic's web UI.
+
+---
+
+## atomic-ingest
+
+### Architecture
+
+Cron-based Python add-on that ingests data from multiple sources into Atomic via its REST API. Single container with `crond` as PID 1, spawning adapter scripts on schedule.
+
+### Commands
+
+```bash
+# Run tests locally
+cd atomic-ingest && pip install -r requirements.txt && pip install pytest
+python -m pytest tests/ -v
+```
+
+### Configuration
+
+Three HA UI options: `atomic_api_url`, `atomic_api_token`, `log_level`. All source-specific credentials and schedule overrides in `.env` at `/addon_configs/atomic-ingest/` (mounted as `/config/` inside container).
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `config.yaml` | HA add-on manifest |
+| `Dockerfile` | python:3.12-slim + cron |
+| `run.sh` | Entrypoint — env setup, crontab gen, exec crond |
+| `lib/atomic_client.py` | Atomic REST API client |
+| `lib/sync_state.py` | Per-adapter JSON state in /data/ |
+| `lib/folder_consumer.py` | Consume/processed folder pattern |
+| `adapters/readwise.py` | Readwise Highlights + Reader |
+| `adapters/raindrop.py` | Raindrop.io bookmarks via ingest_url |
+| `adapters/evernote.py` | ENEX file import via bulk create |
+
+### Adapters
+
+**Readwise** (hourly): Highlights v2 export (one atom per book) + Reader v3 list (ingest_url + highlight enrichment). Auth: `READWISE_API_TOKEN`.
+
+**Raindrop** (hourly): Bookmarks via `ingest_url` for URLs, `create_atom` for uploaded files. Notes/highlights appended via update. Auth: `RAINDROP_TOKEN`.
+
+**Evernote** (daily): Scans `/share/atomic-ingest/evernote/consume/` for `.enex` files, parses to Markdown, bulk creates, moves to `processed/`.
+
+### Adding a new adapter
+
+1. Create `adapters/<name>.py` with a `main()` that reads env vars, imports from `lib/`, and syncs
+2. Add credential env var to `.env.example`
+3. Add `<NAME>_SCHEDULE` to `run.sh` crontab generation with a default
+4. Add the env var export to `run.sh`'s env dump

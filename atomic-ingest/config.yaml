@@ -1,0 +1,26 @@
+name: Atomic Ingest
+description: >-
+  Automated data ingestion into Atomic knowledge base.
+  Readwise, Raindrop.io, Evernote, and more.
+version: "1.0.0"
+slug: atomic-ingest
+url: "https://github.com/maksyms/ha-addons"
+arch:
+  - aarch64
+init: false
+startup: application
+boot: auto
+
+options:
+  atomic_api_url: ""
+  atomic_api_token: ""
+  log_level: "info"
+schema:
+  atomic_api_url: url
+  atomic_api_token: password
+  log_level: "list(debug|info|warning|error)"
+
+map:
+  - data:rw
+  - share:rw
+  - addon_config:ro
