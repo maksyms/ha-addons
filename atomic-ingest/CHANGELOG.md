@@ -1,0 +1,9 @@
+## 1.0.1
+- feat: add atomic-ingest HA add-on
+- feat: add justfile with push, wait-and-update, and pushdeploy recipes
+- fix(atomic): use container hostname in Caddyfile example
+- feat(atomic): add Atomic knowledge base HA add-on
+- fix(paperless-ngx): respect user-set FORCE_SCRIPT_NAME over ingress path
+- fix(tika-gotenberg): add python3-uno for unoconverter LibreOffice bindings
+
+
