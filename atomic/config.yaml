@@ -1,0 +1,34 @@
+name: Atomic
+description: >-
+  Personal knowledge base powered by Atomic Server.
+  Linked data, real-time collaboration, and AI-ready
+  knowledge management with MCP endpoint.
+version: "1.0.0"
+slug: atomic
+url: "https://github.com/kenforthewin/atomic"
+arch:
+  - aarch64
+init: false
+startup: application
+boot: auto
+
+ports:
+  8081/tcp: 8081
+ports_description:
+  8081/tcp: Atomic web UI and API
+
+options:
+  public_url: ""
+  rust_log: "warn"
+schema:
+  public_url: str
+  rust_log: "list(trace|debug|info|warn|error)"
+
+healthcheck: "curl -sf http://localhost:8081/health || exit 1"
+healthcheck_interval: 10
+healthcheck_timeout: 3
+healthcheck_start_period: 15
+healthcheck_retries: 3
+
+map:
+  - data:rw

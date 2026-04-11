@@ -9,6 +9,7 @@ A Home Assistant custom add-on repository (`repository.json` at root) containing
 1. **autoanalyst/** — Telegram userbot that monitors a private chat for tweet links, fetches content, sends it to Claude for critical analysis, and posts back. Uses Telethon (MTProto).
 2. **claudecode-ea/** — Telegram bot bridging to Claude Code via Agent SDK. Wraps [Claudegram](https://github.com/NachoSEO/claudegram) as an HA add-on.
 3. **paperless-gpt/** — HA add-on wrapping [icereed/paperless-gpt](https://github.com/icereed/paperless-gpt). AI-powered document organizer for Paperless-ngx (titles, tags, correspondents, dates via LLM vision OCR).
+4. **atomic/** — HA add-on wrapping [kenforthewin/atomic](https://github.com/kenforthewin/atomic). Personal knowledge base with linked data, real-time collaboration, MCP endpoint for AI tools, and OAuth auth. Uses pre-built upstream Docker images.
 
 ## Repository Structure
 
@@ -44,6 +45,11 @@ A Home Assistant custom add-on repository (`repository.json` at root) containing
 │   ├── Dockerfile               # Wraps icereed/paperless-gpt:latest
 │   ├── run.sh                   # options.json → env vars, waits for paperless-ngx
 │   └── CHANGELOG.md
+├── atomic/                      # Personal knowledge base add-on
+│   ├── config.yaml              # HA add-on manifest (aarch64)
+│   ├── Dockerfile               # COPY --from upstream ghcr.io image
+│   ├── run.sh                   # reads options.json, starts atomic-server + nginx
+│   └── CHANGELOG.md
 └── .github/workflows/
     ├── deploy-autoanalyst.yml   # CI/CD for autoanalyst
     ├── deploy-claudecode-ea.yml # CI/CD for claudecode-ea
@@ -58,6 +64,8 @@ Each add-on has a separate deploy workflow triggered by pushes to `master` with 
 - Commit with `[skip ci]` to avoid loops
 
 `deploy-claudecode-ea.yml` also supports `workflow_dispatch` with a `force_deploy` option that SCPs files to the HA host and runs `ha apps rebuild`.
+
+`deploy-atomic.yml` follows the same pattern: push-triggered, path-filtered, auto version bump + changelog.
 
 ---
 
@@ -171,3 +179,45 @@ image_max_file_bytes: 2500000     # 2.5MB × 1.36 bug inflate = 3.4MB → base64
 ```
 
 **When #946 merges:** raise `image_max_file_bytes` to ~3,800,000. Keep `image_max_pixel_dimension: 7680`.
+
+---
+
+## atomic
+
+### Architecture
+
+Thin HA add-on wrapper around `ghcr.io/kenforthewin/atomic:latest`. Dockerfile uses `COPY --from` to extract the pre-built `atomic-server` binary, React frontend, and nginx config from the upstream all-in-one image. No Rust compilation.
+
+Two processes in one container:
+- `atomic-server` on `127.0.0.1:8080` (API, WebSocket, MCP, OAuth)
+- `nginx` on `0.0.0.0:8081` (static frontend, reverse proxy, SPA fallback)
+
+`run.sh` starts atomic-server in background, waits for health check, then execs nginx. No supervisord — HA Supervisor restarts the container if the health check fails.
+
+### Access
+
+Caddy (separate HA add-on or host service) reverse-proxies to port 8081 for TLS and internet access. No HA ingress. Atomic runs at `/` with no base-path handling needed.
+
+Caddyfile:
+```
+atomic.example.com {
+    reverse_proxy localhost:8081
+}
+```
+
+### Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `public_url` | `""` | External URL for OAuth/MCP discovery (e.g., `https://atomic.example.com`) |
+| `rust_log` | `warn` | Log verbosity: trace, debug, info, warn, error |
+
+### Data
+
+All data persists in `/data/` (HA-managed volume):
+- `atomic.db` — main SQLite database
+- Additional databases as created
+
+### Integration
+
+`atomic-ingest` (companion add-on, future) accesses Atomic's API on the internal HA Docker network. API tokens created manually via Atomic's web UI.

@@ -51,6 +51,15 @@ Apache Tika and Gotenberg services for document text extraction. Companion to Pa
 - Gotenberg for PDF conversion
 - Shared infrastructure for document processing
 
+### [Atomic](atomic/)
+
+Personal knowledge base powered by Atomic Server. Linked data, real-time collaboration, and AI-ready knowledge management.
+
+- MCP endpoint for AI integration
+- Real-time WebSocket collaboration
+- OAuth authentication
+- Caddy reverse proxy for TLS
+
 ## License
 
 MIT
