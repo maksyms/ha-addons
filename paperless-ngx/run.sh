@@ -50,14 +50,18 @@ export PAPERLESS_BIND_ADDR="${PAPERLESS_BIND_ADDR:-0.0.0.0}"
 
 # --- Ingress subpath support ---
 # HA ingress serves the addon under /api/hassio_ingress/<token>/
-# Paperless-ngx needs FORCE_SCRIPT_NAME to generate correct URLs
-if [ -n "${SUPERVISOR_TOKEN:-}" ]; then
+# Paperless-ngx needs FORCE_SCRIPT_NAME to generate correct URLs.
+# Skip if the user already set PAPERLESS_FORCE_SCRIPT_NAME (e.g. via .env for
+# a reverse-proxy setup like Caddy that bypasses ingress).
+if [ -z "${PAPERLESS_FORCE_SCRIPT_NAME:-}" ] && [ -n "${SUPERVISOR_TOKEN:-}" ]; then
     INGRESS_ENTRY=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
         http://supervisor/addons/self/info | jq -r '.data.ingress_entry // empty')
     if [ -n "$INGRESS_ENTRY" ]; then
         export PAPERLESS_FORCE_SCRIPT_NAME="$INGRESS_ENTRY"
         echo "Ingress path: $INGRESS_ENTRY"
     fi
+else
+    echo "Custom script name: ${PAPERLESS_FORCE_SCRIPT_NAME}"
 fi
 # HA ingress proxy sets X-Forwarded-Host — Django uses it for CSRF validation
 export PAPERLESS_USE_X_FORWARD_HOST=true
