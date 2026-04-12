@@ -118,7 +118,7 @@ wait-and-update addon:
     ssh "${HA_USER}@${HA_HOST}" "ha store refresh"
 
     echo ":: Detecting app slug for '{{addon}}'..."
-    SLUG=$(ssh "${HA_USER}@${HA_HOST}" "ha apps list --raw-json" | jq -r '.data.apps[] | select(.slug | test("{{addon}}")) | .slug')
+    SLUG=$(ssh "${HA_USER}@${HA_HOST}" "ha apps list --raw-json" | jq -r '.data.addons[] | select(.slug | test("{{addon}}")) | .slug')
 
     if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
         echo "ERROR: Could not find HA app slug matching '{{addon}}'"
