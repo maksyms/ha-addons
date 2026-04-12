@@ -6,3 +6,5 @@ __pycache__/
 .venv/
 deploy_key
 deploy_key.pub
+ha-addon-spec.md
+docs/superpowers/
