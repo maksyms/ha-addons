@@ -1,3 +1,6 @@
+## 1.0.3
+- feat(atomic-ingest): add rate limiting, logging, and ingest limit framework
+
 ## 1.0.2
 - docs(atomic-ingest): add README and update repo root README
 
