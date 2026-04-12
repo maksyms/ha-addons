@@ -1,3 +1,7 @@
+## 1.0.2
+- feat(atomic-ingest): add rate limiting, logging, and ingest limit framework
+- docs(atomic-ingest): add README and update repo root README
+
 ## 1.0.1
 - feat(atomic): add Atomic knowledge base HA add-on
 - fix(paperless-ngx): respect user-set FORCE_SCRIPT_NAME over ingress path

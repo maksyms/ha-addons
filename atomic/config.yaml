@@ -3,7 +3,7 @@ description: >-
   Personal knowledge base powered by Atomic Server.
   Linked data, real-time collaboration, and AI-ready
   knowledge management with MCP endpoint.
-version: "1.0.1"
+version: "1.0.2"
 slug: atomic
 url: "https://github.com/kenforthewin/atomic"
 arch:
