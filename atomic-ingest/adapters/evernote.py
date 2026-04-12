@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from lib.atomic_client import AtomicClient
 from lib.folder_consumer import consume
+from lib.limit import get_limit
 from lib import log
 
 CONSUME_DIR = Path("/share/atomic-ingest/evernote/consume")
@@ -110,13 +111,21 @@ def _note_source_url(note: dict, enex_filename: str) -> str:
 
 def main():
     logger = log.setup("evernote")
+    limit = get_limit("evernote")
+    if limit is not None:
+        logger.info("Ingest limit: %d notes", limit)
 
     api_url = os.environ["ATOMIC_API_URL"]
     api_token = os.environ["ATOMIC_API_TOKEN"]
     client = AtomicClient(api_url, api_token)
 
+    total_processed = 0
     files_found = False
     for enex_path, mark_done in consume(CONSUME_DIR, PROCESSED_DIR, "*.enex"):
+        if limit is not None and total_processed >= limit:
+            logger.info("Ingest limit reached (%d), stopping", limit)
+            break
+
         files_found = True
         logger.info("Processing %s", enex_path.name)
 
@@ -124,25 +133,39 @@ def main():
         logger.info("Parsed %d notes from %s", len(notes), enex_path.name)
 
         # Build atom dicts for bulk create
-        atoms = []
+        all_atoms = []
         for note in notes:
             content = format_note_atom(note)
             source_url = _note_source_url(note, enex_path.name)
             atom = {"content": content, "source_url": source_url}
             if note.get("created"):
                 atom["published_at"] = note["created"]
-            atoms.append(atom)
+            all_atoms.append(atom)
+
+        # Apply limit
+        if limit is not None:
+            remaining = limit - total_processed
+            atoms = all_atoms[:remaining]
+        else:
+            atoms = all_atoms
 
         # Bulk create in chunks
         if atoms:
             result = client.create_atoms_bulk(atoms)
+            total_processed += len(atoms)
             logger.info(
                 "%s: %d created, %d skipped",
                 enex_path.name, result["count"], result["skipped"],
             )
 
-        mark_done()
-        logger.info("Moved %s to processed", enex_path.name)
+        if len(atoms) == len(all_atoms):
+            mark_done()
+            logger.info("Moved %s to processed", enex_path.name)
+        else:
+            logger.info(
+                "%s partially processed (%d/%d notes), not moved",
+                enex_path.name, len(atoms), len(all_atoms),
+            )
 
     if not files_found:
         logger.debug("No .enex files found in consume folder")

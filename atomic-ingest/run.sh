@@ -43,6 +43,10 @@ ENV_FILE=/app/env.sh
     printf 'export LOG_LEVEL=%q\n' "${LOG_LEVEL}"
     printf 'export READWISE_API_TOKEN=%q\n' "${READWISE_API_TOKEN:-}"
     printf 'export RAINDROP_TOKEN=%q\n' "${RAINDROP_TOKEN:-}"
+    printf 'export INGEST_LIMIT=%q\n' "${INGEST_LIMIT:-}"
+    printf 'export READWISE_LIMIT=%q\n' "${READWISE_LIMIT:-}"
+    printf 'export RAINDROP_LIMIT=%q\n' "${RAINDROP_LIMIT:-}"
+    printf 'export EVERNOTE_LIMIT=%q\n' "${EVERNOTE_LIMIT:-}"
 } > "$ENV_FILE"
 
 # --- Generate crontab ---

@@ -269,6 +269,7 @@ Three HA UI options: `atomic_api_url`, `atomic_api_token`, `log_level`. All sour
 | `lib/atomic_client.py` | Atomic REST API client |
 | `lib/sync_state.py` | Per-adapter JSON state in /data/ |
 | `lib/folder_consumer.py` | Consume/processed folder pattern |
+| `lib/limit.py` | Framework-level ingest limit for debugging |
 | `adapters/readwise.py` | Readwise Highlights + Reader |
 | `adapters/raindrop.py` | Raindrop.io bookmarks via ingest_url |
 | `adapters/evernote.py` | ENEX file import via bulk create |

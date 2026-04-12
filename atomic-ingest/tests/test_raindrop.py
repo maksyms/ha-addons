@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from adapters.raindrop import classify_bookmark, format_notes_section, sync_raindrop
+from lib.sync_state import SyncState
 
 
 class TestClassifyBookmark:
@@ -108,3 +109,81 @@ class TestSyncRaindrop:
         call_kwargs = client.create_atom.call_args[1]
         assert "# My Document" in call_kwargs["content"]
         client.ingest_url.assert_not_called()
+
+    @patch("adapters.raindrop.time.sleep")
+    @patch("adapters.raindrop.requests.get")
+    def test_handles_rate_limit(self, mock_get, mock_sleep, tmp_state_file):
+        rate_limit_resp = MagicMock(
+            status_code=429, headers={"Retry-After": "5"},
+        )
+        ok_resp = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "items": [{
+                    "_id": 123,
+                    "title": "Example",
+                    "link": "https://example.com",
+                    "note": "",
+                    "highlights": [],
+                    "created": "2026-04-11T00:00:00Z",
+                }],
+            },
+        )
+        mock_get.side_effect = [rate_limit_resp, ok_resp]
+
+        client = MagicMock()
+        client.ingest_url.return_value = {"atom_id": "uuid-1"}
+
+        state = SyncState(tmp_state_file)
+        sync_raindrop(client, state, "test-token")
+
+        mock_sleep.assert_called_once_with(5)
+        client.ingest_url.assert_called_once()
+
+    @patch("adapters.raindrop.get_limit", return_value=1)
+    @patch("adapters.raindrop.requests.get")
+    def test_respects_ingest_limit(self, mock_get, mock_limit, tmp_state_file):
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "items": [
+                    {"_id": 1, "title": "First", "link": "https://first.com",
+                     "note": "", "highlights": [], "created": "2026-04-11T00:00:00Z"},
+                    {"_id": 2, "title": "Second", "link": "https://second.com",
+                     "note": "", "highlights": [], "created": "2026-04-11T00:00:00Z"},
+                ],
+            },
+        )
+
+        client = MagicMock()
+        client.ingest_url.return_value = {"atom_id": "uuid-1"}
+
+        state = SyncState(tmp_state_file)
+        sync_raindrop(client, state, "test-token")
+
+        # Only first item should be processed
+        assert client.ingest_url.call_count == 1
+        # Sync state should not be updated (limit active)
+        assert state.get("raindrop") == {}
+
+    @patch("adapters.raindrop.get_limit", return_value=None)
+    @patch("adapters.raindrop.requests.get")
+    def test_updates_sync_state_without_limit(self, mock_get, mock_limit, tmp_state_file):
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "items": [{
+                    "_id": 1, "title": "Example", "link": "https://example.com",
+                    "note": "", "highlights": [], "created": "2026-04-11T00:00:00Z",
+                }],
+            },
+        )
+
+        client = MagicMock()
+        client.ingest_url.return_value = {"atom_id": "uuid-1"}
+
+        state = SyncState(tmp_state_file)
+        sync_raindrop(client, state, "test-token")
+
+        # Sync state should be updated
+        assert state.get("raindrop").get("last_sync_date") is not None

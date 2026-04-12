@@ -52,6 +52,12 @@ RAINDROP_TOKEN=
 # READWISE_SCHEDULE="0 * * * *"    # default: hourly on the hour
 # RAINDROP_SCHEDULE="30 * * * *"   # default: hourly at :30
 # EVERNOTE_SCHEDULE="0 3 * * *"    # default: daily at 3am
+
+# Debug: limit items processed per adapter run (remove for production)
+# INGEST_LIMIT=5                   # global limit for all adapters
+# READWISE_LIMIT=5                 # override for readwise only
+# RAINDROP_LIMIT=5                 # override for raindrop only
+# EVERNOTE_LIMIT=5                 # override for evernote only
 ```
 
 ## Architecture
@@ -72,6 +78,17 @@ crond (PID 1)
 | `lib/atomic_client.py` | Atomic REST API client (`ingest_url`, `create_atom`, `update_atom`, `bulk_create`) |
 | `lib/sync_state.py` | Per-adapter JSON state persistence in `/data/` |
 | `lib/folder_consumer.py` | Consume/processed folder pattern for file-based adapters |
+| `lib/limit.py` | Framework-level ingest limit for debugging |
+
+## Debugging
+
+Set `INGEST_LIMIT=N` in `.env` to limit each adapter to N items per run. Useful for testing connectivity and verifying pipeline behavior without ingesting everything.
+
+Per-adapter overrides (`READWISE_LIMIT`, `RAINDROP_LIMIT`, `EVERNOTE_LIMIT`) take precedence over the global limit.
+
+When a limit is active:
+- **Sync state is not updated** — the next unlimited run picks up from where the last real run left off
+- **Evernote**: partially-processed files stay in `consume/` for re-processing (dedup prevents duplicates)
 
 ## Adding a New Adapter
 

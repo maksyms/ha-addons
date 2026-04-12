@@ -4,8 +4,10 @@ URL bookmarks: ingest_url for full content, enrich with notes/highlights.
 Uploaded files/videos: create_atom with title + note.
 """
 
+import logging
 import os
 import sys
+import time
 import requests
 from datetime import date
 
@@ -13,10 +15,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from lib.atomic_client import AtomicClient, AtomicAPIError
 from lib.sync_state import SyncState
+from lib.limit import get_limit
 from lib import log
 
 RAINDROP_API_URL = "https://api.raindrop.io/rest/v1/raindrops/0"
 PAGE_SIZE = 50
+RATE_LIMIT_WAIT = 60
 
 
 def classify_bookmark(bm: dict) -> str:
@@ -50,9 +54,18 @@ def format_notes_section(note: str, highlights: list[dict]) -> str:
 
 
 def _raindrop_get(url: str, token: str, params: dict) -> dict:
-    """Make a Raindrop API GET request."""
+    """Make a Raindrop API GET request with rate limit handling."""
     headers = {"Authorization": f"Bearer {token}"}
     resp = requests.get(url, headers=headers, params=params)
+
+    if resp.status_code == 429:
+        retry_after = int(resp.headers.get("Retry-After", RATE_LIMIT_WAIT))
+        logging.getLogger("raindrop").warning(
+            "Rate limited, waiting %ds", retry_after,
+        )
+        time.sleep(retry_after)
+        resp = requests.get(url, headers=headers, params=params)
+
     resp.raise_for_status()
     return resp.json()
 
@@ -60,6 +73,10 @@ def _raindrop_get(url: str, token: str, params: dict) -> dict:
 def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
     """Sync Raindrop.io bookmarks."""
     logger = log.setup("raindrop")
+    limit = get_limit("raindrop")
+    if limit is not None:
+        logger.info("Ingest limit: %d items", limit)
+
     adapter_state = state.get("raindrop")
     last_sync_date = adapter_state.get("last_sync_date")
 
@@ -68,6 +85,7 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
         params["search"] = f"lastUpdate:>{last_sync_date}"
 
     page = 0
+    processed = 0
     ingested = 0
     enriched = 0
     created = 0
@@ -80,7 +98,14 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
         if not items:
             break
 
+        logger.info("Page %d: %d items", page, len(items))
+
         for bm in items:
+            if limit is not None and processed >= limit:
+                logger.info("Ingest limit reached (%d), stopping", limit)
+                break
+
+            processed += 1
             kind = classify_bookmark(bm)
             link = bm.get("link", "").strip()
             title = bm.get("title", "Untitled")
@@ -99,14 +124,16 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                     published_at=published_at,
                 )
                 created += 1
+                logger.info("Created atom: %s (uploaded)", title)
 
             elif kind == "url_clean":
                 try:
                     client.ingest_url(url=link, published_at=published_at)
                     ingested += 1
+                    logger.info("Ingested URL: %s", link)
                 except AtomicAPIError as e:
                     if e.status_code == 409 or "already exists" in e.message.lower():
-                        logger.debug("URL already ingested: %s", link)
+                        logger.debug("Already ingested: %s", link)
                     else:
                         logger.warning("Failed to ingest %s: %s", link, e)
 
@@ -114,10 +141,12 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                 try:
                     client.ingest_url(url=link, published_at=published_at)
                     ingested += 1
+                    logger.info("Ingested URL: %s", link)
                 except AtomicAPIError as e:
                     if e.status_code != 409 and "already exists" not in e.message.lower():
                         logger.warning("Failed to ingest %s: %s", link, e)
                         continue
+                    logger.debug("Already ingested: %s", link)
 
                 # Enrich with notes/highlights
                 section = format_notes_section(note, highlights)
@@ -127,18 +156,24 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                         new_content = existing["content"] + section
                         client.update_atom(existing["id"], content=new_content)
                         enriched += 1
+                        logger.info("Enriched atom: %s", link)
 
+        if limit is not None and processed >= limit:
+            break
         if len(items) < PAGE_SIZE:
             break
         page += 1
 
-    # Update sync state
-    adapter_state["last_sync_date"] = date.today().isoformat()
-    state.save("raindrop", adapter_state)
+    # Only update sync state if not in limited mode
+    if limit is None:
+        adapter_state["last_sync_date"] = date.today().isoformat()
+        state.save("raindrop", adapter_state)
+    else:
+        logger.info("Sync state not updated (ingest limit active)")
 
     logger.info(
-        "Raindrop sync complete: %d ingested, %d enriched, %d created (uploaded)",
-        ingested, enriched, created,
+        "Raindrop sync complete: %d processed, %d ingested, %d enriched, %d created",
+        processed, ingested, enriched, created,
     )
 
 
