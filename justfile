@@ -2,9 +2,9 @@
 #
 # Usage (for Claude and humans):
 #
-#   just push "commit message"
+#   just push "commit message" [files...]
 #     Stash local changes, pull --rebase from origin, pop stash,
-#     stage all changes, commit with the given message, and push.
+#     stage specified files (or all if none given), commit with the given message, and push.
 #
 #   just wait-and-update <addon>
 #     Poll the CI workflow for deploy-<addon>.yml until it completes.
@@ -13,7 +13,7 @@
 #       ha apps update <detected-slug>
 #     On failure or timeout, exit with an error.
 #
-#   just pushdeploy <addon> "commit message"
+#   just pushdeploy <addon> "commit message" [files...]
 #     Run push, then wait-and-update sequentially.
 #
 # Variables (override with `just --set var value`):
@@ -27,11 +27,14 @@ ha_user := "root"
 poll_interval := "30"
 ci_timeout := "1800"
 
-# Stash, pull --rebase, pop, add all, commit, push.
+# Stash, pull --rebase, pop, add files, commit, push.
 # Parameters:
 #   message - the git commit message (required)
-# Example: just push "fix(autoanalyst): handle empty tweet bodies"
-push message:
+#   files   - files/dirs to stage (optional, defaults to -A)
+# Examples:
+#   just push "fix(autoanalyst): handle empty tweet bodies"
+#   just push "feat(atomic): add health check" atomic/
+push message *files:
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -50,8 +53,14 @@ push message:
         git stash pop
     fi
 
-    echo ":: Staging all changes..."
-    git add -A
+    FILES="{{files}}"
+    if [ -z "$FILES" ]; then
+        echo ":: Staging all changes..."
+        git add -A
+    else
+        echo ":: Staging: $FILES"
+        git add $FILES
+    fi
 
     echo ":: Committing..."
     git commit -m "{{message}}"
@@ -134,7 +143,10 @@ wait-and-update addon:
 # Parameters:
 #   addon   - add-on directory name (e.g., autoanalyst, claudecode-ea, atomic)
 #   message - the git commit message (required)
-# Example: just pushdeploy autoanalyst "fix(autoanalyst): handle empty tweet bodies"
-pushdeploy addon message:
-    just push "{{message}}"
+#   files   - files/dirs to stage (optional, defaults to -A)
+# Examples:
+#   just pushdeploy autoanalyst "fix(autoanalyst): handle empty tweet bodies"
+#   just pushdeploy atomic "feat(atomic): add health check" atomic/
+pushdeploy addon message *files:
+    just push "{{message}}" {{files}}
     just wait-and-update "{{addon}}"
