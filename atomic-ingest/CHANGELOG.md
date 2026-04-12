@@ -1,3 +1,8 @@
+## 1.0.4
+- chore: remove specs/plans from tracking, already gitignored
+- chore: remove accidentally committed specs, gitignore future ones
+- fix(justfile): use .data.addons[] instead of .data.apps[] in slug detection
+
 ## 1.0.3
 - feat(atomic-ingest): add rate limiting, logging, and ingest limit framework
 
