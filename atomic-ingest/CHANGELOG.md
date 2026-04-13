@@ -1,3 +1,6 @@
+## 1.0.6
+- fix(atomic-ingest): add PATH to crontab for python3 in /usr/local/bin
+
 ## 1.0.5
 - fix(atomic-ingest): use python3 in crontab entries
 
