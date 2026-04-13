@@ -56,9 +56,9 @@ EVERNOTE_SCHEDULE="${EVERNOTE_SCHEDULE:-0 3 * * *}"
 
 CRONTAB_FILE=/etc/cron.d/atomic-ingest
 cat > "$CRONTAB_FILE" <<EOF
-${READWISE_SCHEDULE} root . /app/env.sh && cd /app && python -u adapters/readwise.py >> /proc/1/fd/1 2>&1
-${RAINDROP_SCHEDULE} root . /app/env.sh && cd /app && python -u adapters/raindrop.py >> /proc/1/fd/1 2>&1
-${EVERNOTE_SCHEDULE} root . /app/env.sh && cd /app && python -u adapters/evernote.py >> /proc/1/fd/1 2>&1
+${READWISE_SCHEDULE} root . /app/env.sh && cd /app && python3 -u adapters/readwise.py >> /proc/1/fd/1 2>&1
+${RAINDROP_SCHEDULE} root . /app/env.sh && cd /app && python3 -u adapters/raindrop.py >> /proc/1/fd/1 2>&1
+${EVERNOTE_SCHEDULE} root . /app/env.sh && cd /app && python3 -u adapters/evernote.py >> /proc/1/fd/1 2>&1
 EOF
 
 chmod 0644 "$CRONTAB_FILE"
