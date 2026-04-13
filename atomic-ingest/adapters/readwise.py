@@ -15,6 +15,7 @@ from lib.atomic_client import AtomicClient, AtomicAPIError
 from lib.sync_state import SyncState
 from lib.limit import get_limit
 from lib import log
+from lib.fallback_atom import is_content_parse_error, format_fallback_atom
 
 READWISE_EXPORT_URL = "https://readwise.io/api/v2/export/"
 READWISE_READER_URL = "https://readwise.io/api/v3/list/"
@@ -183,6 +184,20 @@ def sync_reader(client: AtomicClient, state: SyncState, token: str, limit: int |
             except AtomicAPIError as e:
                 if e.status_code == 409 or "already exists" in e.message.lower():
                     logger.debug("URL already ingested: %s", source_url)
+                elif is_content_parse_error(e):
+                    content = format_fallback_atom(
+                        title=doc.get("title", "Untitled"),
+                        source=doc.get("site_name", ""),
+                        author=doc.get("author", ""),
+                        summary=doc.get("summary", "").strip(),
+                    )
+                    client.create_atom(
+                        content=content,
+                        source_url=source_url,
+                        published_at=published_at,
+                    )
+                    ingested += 1
+                    logger.info("Created fallback atom: %s", source_url)
                 else:
                     logger.warning("Failed to ingest %s: %s", source_url, e)
                     continue

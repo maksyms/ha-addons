@@ -17,6 +17,7 @@ from lib.atomic_client import AtomicClient, AtomicAPIError
 from lib.sync_state import SyncState
 from lib.limit import get_limit
 from lib import log
+from lib.fallback_atom import is_content_parse_error, format_fallback_atom
 
 RAINDROP_API_URL = "https://api.raindrop.io/rest/v1/raindrops/0"
 PAGE_SIZE = 50
@@ -134,6 +135,21 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                 except AtomicAPIError as e:
                     if e.status_code == 409 or "already exists" in e.message.lower():
                         logger.debug("Already ingested: %s", link)
+                    elif is_content_parse_error(e):
+                        content = format_fallback_atom(
+                            title=title,
+                            source=bm.get("domain", ""),
+                            type=bm.get("type", ""),
+                            tags=[t for t in bm.get("tags", []) if t],
+                            summary=bm.get("excerpt", "").strip(),
+                        )
+                        client.create_atom(
+                            content=content,
+                            source_url=link,
+                            published_at=published_at,
+                        )
+                        created += 1
+                        logger.info("Created fallback atom: %s", link)
                     else:
                         logger.warning("Failed to ingest %s: %s", link, e)
 
@@ -143,10 +159,26 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                     ingested += 1
                     logger.info("Ingested URL: %s", link)
                 except AtomicAPIError as e:
-                    if e.status_code != 409 and "already exists" not in e.message.lower():
+                    if e.status_code == 409 or "already exists" in e.message.lower():
+                        logger.debug("Already ingested: %s", link)
+                    elif is_content_parse_error(e):
+                        content = format_fallback_atom(
+                            title=title,
+                            source=bm.get("domain", ""),
+                            type=bm.get("type", ""),
+                            tags=[t for t in bm.get("tags", []) if t],
+                            summary=bm.get("excerpt", "").strip(),
+                        )
+                        client.create_atom(
+                            content=content,
+                            source_url=link,
+                            published_at=published_at,
+                        )
+                        created += 1
+                        logger.info("Created fallback atom: %s", link)
+                    else:
                         logger.warning("Failed to ingest %s: %s", link, e)
                         continue
-                    logger.debug("Already ingested: %s", link)
 
                 # Enrich with notes/highlights
                 section = format_notes_section(note, highlights)

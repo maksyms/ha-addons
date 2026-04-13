@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from adapters.raindrop import classify_bookmark, format_notes_section, sync_raindrop
 from lib.sync_state import SyncState
+from lib.atomic_client import AtomicAPIError
 
 
 class TestClassifyBookmark:
@@ -187,3 +188,113 @@ class TestSyncRaindrop:
 
         # Sync state should be updated
         assert state.get("raindrop").get("last_sync_date") is not None
+
+
+class TestSyncRaindropFallback:
+    @patch("adapters.raindrop.requests.get")
+    def test_creates_fallback_atom_on_parse_error(self, mock_get, tmp_state_file):
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "items": [{
+                    "_id": 789,
+                    "title": "Cool Homepage",
+                    "link": "https://cool.io",
+                    "excerpt": "A cool tool for developers.",
+                    "domain": "cool.io",
+                    "type": "link",
+                    "tags": ["tools", "dev"],
+                    "note": "",
+                    "highlights": [],
+                    "created": "2026-04-11T00:00:00Z",
+                }],
+            },
+        )
+
+        client = MagicMock()
+        client.ingest_url.side_effect = AtomicAPIError(
+            500, '{"error":"Ingestion error: Page is not article-shaped (failed readability check)"}',
+        )
+        client.create_atom.return_value = {"id": "uuid-fb"}
+
+        state = SyncState(tmp_state_file)
+        sync_raindrop(client, state, "test-token")
+
+        client.create_atom.assert_called_once()
+        call_kwargs = client.create_atom.call_args[1]
+        assert "# Cool Homepage" in call_kwargs["content"]
+        assert "**Source:** cool.io" in call_kwargs["content"]
+        assert "**Tags:** tools, dev" in call_kwargs["content"]
+        assert "## Summary" in call_kwargs["content"]
+        assert "A cool tool for developers." in call_kwargs["content"]
+        assert call_kwargs["source_url"] == "https://cool.io"
+        assert call_kwargs["published_at"] == "2026-04-11T00:00:00Z"
+
+    @patch("adapters.raindrop.requests.get")
+    def test_skips_on_http_fetch_error(self, mock_get, tmp_state_file):
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "items": [{
+                    "_id": 790,
+                    "title": "Dead Link",
+                    "link": "https://dead.com",
+                    "excerpt": "",
+                    "domain": "dead.com",
+                    "type": "link",
+                    "tags": [],
+                    "note": "",
+                    "highlights": [],
+                    "created": "2026-04-11T00:00:00Z",
+                }],
+            },
+        )
+
+        client = MagicMock()
+        client.ingest_url.side_effect = AtomicAPIError(
+            500, '{"error":"Ingestion error: HTTP 403 Forbidden for https://dead.com"}',
+        )
+
+        state = SyncState(tmp_state_file)
+        sync_raindrop(client, state, "test-token")
+
+        client.create_atom.assert_not_called()
+
+    @patch("adapters.raindrop.requests.get")
+    def test_fallback_for_annotated_url_still_enriches(self, mock_get, tmp_state_file):
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "items": [{
+                    "_id": 791,
+                    "title": "Annotated Homepage",
+                    "link": "https://annotated.io",
+                    "excerpt": "Some description.",
+                    "domain": "annotated.io",
+                    "type": "link",
+                    "tags": [],
+                    "note": "My thoughts on this",
+                    "highlights": [{"text": "Key quote"}],
+                    "created": "2026-04-11T00:00:00Z",
+                }],
+            },
+        )
+
+        client = MagicMock()
+        client.ingest_url.side_effect = AtomicAPIError(
+            500, '{"error":"Ingestion error: Page is not article-shaped (failed readability check)"}',
+        )
+        client.create_atom.return_value = {"id": "uuid-fb2"}
+        client.get_atom_by_source_url.return_value = {"id": "uuid-fb2", "content": "# Annotated Homepage\n\n**Source:** annotated.io\n\n## Summary\nSome description."}
+        client.update_atom.return_value = {"id": "uuid-fb2"}
+
+        state = SyncState(tmp_state_file)
+        sync_raindrop(client, state, "test-token")
+
+        # Fallback atom created
+        client.create_atom.assert_called_once()
+        # Then enriched with notes
+        client.update_atom.assert_called_once()
+        update_kwargs = client.update_atom.call_args[1]
+        assert "## My Notes" in update_kwargs["content"]
+        assert "My thoughts on this" in update_kwargs["content"]
