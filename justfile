@@ -71,10 +71,15 @@ push message *files:
     echo ":: Done."
 
 # Monitor CI workflow for an add-on, then update the HA app.
+# Finds the CI run matching the given commit SHA (or HEAD if omitted),
+# waits for it to complete, then refreshes the HA store and updates the app.
 # Parameters:
 #   addon - add-on directory name (e.g., autoanalyst, claudecode-ea, atomic)
-# Example: just wait-and-update autoanalyst
-wait-and-update addon:
+#   sha   - (optional) commit SHA to match; defaults to current HEAD
+# Examples:
+#   just wait-and-update autoanalyst
+#   just wait-and-update autoanalyst abc1234
+wait-and-update addon sha="":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -84,17 +89,33 @@ wait-and-update addon:
     HA_HOST="{{ha_host}}"
     HA_USER="{{ha_user}}"
 
-    echo ":: Finding latest CI run for ${WORKFLOW}..."
-    RUN_JSON=$(gh run list --workflow "$WORKFLOW" --branch master --limit 1 --json databaseId,status,conclusion,url)
-    RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId')
-
-    if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-        echo "ERROR: No workflow runs found for ${WORKFLOW}"
-        exit 1
+    SHA="{{sha}}"
+    if [ -z "$SHA" ]; then
+        SHA=$(git rev-parse HEAD)
     fi
 
-    echo ":: Watching run ${RUN_ID}..."
+    echo ":: Waiting for CI run for ${WORKFLOW} @ ${SHA:0:7}..."
     ELAPSED=0
+    RUN_ID=""
+    while true; do
+        if [ "$ELAPSED" -ge "$CI_TIMEOUT" ]; then
+            echo "ERROR: Timed out waiting for CI run to appear after ${ELAPSED}s"
+            exit 1
+        fi
+
+        RUN_ID=$(gh run list --workflow "$WORKFLOW" --branch master --commit "$SHA" --limit 1 \
+            --json databaseId | jq -r '.[0].databaseId // "null"')
+
+        if [ "$RUN_ID" != "null" ] && [ -n "$RUN_ID" ]; then
+            break
+        fi
+
+        echo "   Waiting for run to appear... (${ELAPSED}s elapsed)"
+        sleep "$POLL_INTERVAL"
+        ELAPSED=$((ELAPSED + POLL_INTERVAL))
+    done
+
+    echo ":: Watching run ${RUN_ID}..."
     while true; do
         VIEW_JSON=$(gh run view "$RUN_ID" --json status,conclusion,url)
         STATUS=$(echo "$VIEW_JSON" | jq -r '.status')
@@ -140,6 +161,8 @@ wait-and-update addon:
     echo ":: Done. ${SLUG} updated."
 
 # Push changes then wait for CI and update the HA app.
+# Captures the HEAD SHA after push and passes it to wait-and-update
+# so the correct CI run is tracked regardless of timing.
 # Parameters:
 #   addon   - add-on directory name (e.g., autoanalyst, claudecode-ea, atomic)
 #   message - the git commit message (required)
@@ -149,4 +172,4 @@ wait-and-update addon:
 #   just pushdeploy atomic "feat(atomic): add health check" atomic/
 pushdeploy addon message *files:
     just push "{{message}}" {{files}}
-    just wait-and-update "{{addon}}"
+    just wait-and-update "{{addon}}" "$(git rev-parse HEAD)"
