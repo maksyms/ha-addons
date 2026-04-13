@@ -2,7 +2,7 @@ name: Atomic Ingest
 description: >-
   Automated data ingestion into Atomic knowledge base.
   Readwise, Raindrop.io, Evernote, and more.
-version: "1.0.4"
+version: "1.0.5"
 slug: atomic-ingest
 url: "https://github.com/maksyms/ha-addons"
 arch:

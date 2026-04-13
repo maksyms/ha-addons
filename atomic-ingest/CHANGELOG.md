@@ -1,3 +1,6 @@
+## 1.0.5
+- fix(atomic-ingest): use python3 in crontab entries
+
 ## 1.0.4
 - chore: remove specs/plans from tracking, already gitignored
 - chore: remove accidentally committed specs, gitignore future ones
