@@ -4,12 +4,13 @@ URL bookmarks: ingest_url for full content, enrich with notes/highlights.
 Uploaded files/videos: create_atom with title + note.
 """
 
+import json
 import logging
 import os
 import sys
 import time
 import requests
-from datetime import date
+from datetime import date, datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -18,6 +19,22 @@ from lib.sync_state import SyncState
 from lib.limit import get_limit
 from lib import log
 from lib.fallback_atom import is_content_parse_error, format_fallback_atom
+
+SKIP_LOG_PATH = "/share/atomic-ingest/raindrop_skipped.jsonl"
+
+def log_skipped(bm: dict, reason: str):
+    """Append a skipped bookmark to the skip log."""
+    entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "raindrop_id": bm.get("_id"),
+        "title": bm.get("title", ""),
+        "link": bm.get("link", ""),
+        "reason": reason,
+    }
+    os.makedirs(os.path.dirname(SKIP_LOG_PATH), exist_ok=True)
+    with open(SKIP_LOG_PATH, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+
 
 RAINDROP_API_URL = "https://api.raindrop.io/rest/v1/raindrops/0"
 PAGE_SIZE = 50
@@ -90,6 +107,7 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
     ingested = 0
     enriched = 0
     created = 0
+    skipped = 0
 
     while True:
         params["page"] = page
@@ -119,13 +137,18 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                 if note.strip():
                     content += f"\n\n{note.strip()}"
                 source_url = f"https://app.raindrop.io/my/0/{bm.get('_id', '')}"
-                client.create_atom(
-                    content=content,
-                    source_url=source_url,
-                    published_at=published_at,
-                )
-                created += 1
-                logger.info("Created atom: %s (uploaded)", title)
+                try:
+                    client.create_atom(
+                        content=content,
+                        source_url=source_url,
+                        published_at=published_at,
+                    )
+                    created += 1
+                    logger.info("Created atom: %s (uploaded)", title)
+                except AtomicAPIError as e:
+                    logger.warning("Failed to create atom for upload %s: %s", title, e)
+                    log_skipped(bm, f"create_atom failed: {e}")
+                    skipped += 1
 
             elif kind == "url_clean":
                 try:
@@ -152,6 +175,8 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                         logger.info("Created fallback atom: %s", link)
                     else:
                         logger.warning("Failed to ingest %s: %s", link, e)
+                        log_skipped(bm, f"ingest_url failed: {e}")
+                        skipped += 1
 
             elif kind == "url_annotated":
                 try:
@@ -178,17 +203,24 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                         logger.info("Created fallback atom: %s", link)
                     else:
                         logger.warning("Failed to ingest %s: %s", link, e)
+                        log_skipped(bm, f"ingest_url failed: {e}")
+                        skipped += 1
                         continue
 
                 # Enrich with notes/highlights
                 section = format_notes_section(note, highlights)
                 if section:
-                    existing = client.get_atom_by_source_url(link)
-                    if existing:
-                        new_content = existing["content"] + section
-                        client.update_atom(existing["id"], content=new_content)
-                        enriched += 1
-                        logger.info("Enriched atom: %s", link)
+                    try:
+                        existing = client.get_atom_by_source_url(link)
+                        if existing:
+                            new_content = existing["content"] + section
+                            client.update_atom(existing["id"], content=new_content)
+                            enriched += 1
+                            logger.info("Enriched atom: %s", link)
+                    except AtomicAPIError as e:
+                        logger.warning("Failed to enrich %s: %s", link, e)
+                        log_skipped(bm, f"enrichment failed: {e}")
+                        skipped += 1
 
         if limit is not None and processed >= limit:
             break
@@ -204,9 +236,11 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
         logger.info("Sync state not updated (ingest limit active)")
 
     logger.info(
-        "Raindrop sync complete: %d processed, %d ingested, %d enriched, %d created",
-        processed, ingested, enriched, created,
+        "Raindrop sync complete: %d processed, %d ingested, %d enriched, %d created, %d skipped",
+        processed, ingested, enriched, created, skipped,
     )
+    if skipped:
+        logger.info("Skipped items logged to %s", SKIP_LOG_PATH)
 
 
 def main():
