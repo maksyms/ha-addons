@@ -1,3 +1,6 @@
+## 1.0.8
+- feat(atomic-ingest): log skipped raindrop items to /share JSONL file
+
 ## 1.0.7
 - feat(atomic-ingest): fallback atom creation for failed URL ingestion
 
