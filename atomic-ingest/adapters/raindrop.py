@@ -156,7 +156,7 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                     ingested += 1
                     logger.info("Ingested URL: %s", link)
                 except AtomicAPIError as e:
-                    if e.status_code == 409 or "already exists" in e.message.lower():
+                    if e.status_code in (400, 409) or "already ingested" in e.message.lower() or "already exists" in e.message.lower():
                         logger.debug("Already ingested: %s", link)
                     elif is_content_parse_error(e):
                         content = format_fallback_atom(
@@ -164,7 +164,7 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                             source=bm.get("domain", ""),
                             type=bm.get("type", ""),
                             tags=[t for t in bm.get("tags", []) if t],
-                            summary=bm.get("excerpt", "").strip(),
+                            summary=(bm.get("excerpt") or "").strip(),
                         )
                         client.create_atom(
                             content=content,
@@ -184,7 +184,7 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                     ingested += 1
                     logger.info("Ingested URL: %s", link)
                 except AtomicAPIError as e:
-                    if e.status_code == 409 or "already exists" in e.message.lower():
+                    if e.status_code in (400, 409) or "already ingested" in e.message.lower() or "already exists" in e.message.lower():
                         logger.debug("Already ingested: %s", link)
                     elif is_content_parse_error(e):
                         content = format_fallback_atom(
@@ -192,7 +192,7 @@ def sync_raindrop(client: AtomicClient, state: SyncState, token: str):
                             source=bm.get("domain", ""),
                             type=bm.get("type", ""),
                             tags=[t for t in bm.get("tags", []) if t],
-                            summary=bm.get("excerpt", "").strip(),
+                            summary=(bm.get("excerpt") or "").strip(),
                         )
                         client.create_atom(
                             content=content,

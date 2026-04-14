@@ -182,14 +182,14 @@ def sync_reader(client: AtomicClient, state: SyncState, token: str, limit: int |
                 client.ingest_url(url=source_url, published_at=published_at)
                 ingested += 1
             except AtomicAPIError as e:
-                if e.status_code == 409 or "already exists" in e.message.lower():
+                if e.status_code in (400, 409) or "already ingested" in e.message.lower() or "already exists" in e.message.lower():
                     logger.debug("URL already ingested: %s", source_url)
                 elif is_content_parse_error(e):
                     content = format_fallback_atom(
                         title=doc.get("title", "Untitled"),
                         source=doc.get("site_name", ""),
                         author=doc.get("author", ""),
-                        summary=doc.get("summary", "").strip(),
+                        summary=(doc.get("summary") or "").strip(),
                     )
                     client.create_atom(
                         content=content,
