@@ -1,3 +1,6 @@
+## 1.0.9
+- fix(atomic-ingest): fix NoneType crash and duplicate URL detection
+
 ## 1.0.8
 - feat(atomic-ingest): log skipped raindrop items to /share JSONL file
 
