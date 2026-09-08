@@ -17,6 +17,7 @@ import os
 import re
 import signal
 import sys
+import time
 
 import anthropic
 import httpx
@@ -47,6 +48,12 @@ ANALYSIS_BACKEND = os.environ.get("ANALYSIS_BACKEND", "claude").lower()
 PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY", "")
 PERPLEXITY_MODEL = os.environ.get("PERPLEXITY_MODEL", "sonar-pro")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+
+# Reconnect backoff (seconds) for sessions that die outside Telethon's own retries
+RECONNECT_BACKOFF_MIN = 5
+RECONNECT_BACKOFF_MAX = 300
+# A session alive this long before dying counts as healthy: reset the backoff
+RECONNECT_BACKOFF_RESET_AFTER = 300
 
 # ---------------------------------------------------------------------------
 # Tweet URL regex & dedup cache
@@ -567,7 +574,16 @@ def format_response(tweet: dict, analysis: str) -> str:
 
 
 def build_client() -> TelegramClient:
-    return TelegramClient("autoanalyst", TELEGRAM_API_ID, TELEGRAM_API_HASH)
+    # connection_retries=None means retry forever (Telethon treats a non-positive
+    # or None value as an infinite retry_range). The default of 5 gives up after
+    # ~3 minutes, which a transient home-internet outage easily outlasts.
+    return TelegramClient(
+        "autoanalyst",
+        TELEGRAM_API_ID,
+        TELEGRAM_API_HASH,
+        connection_retries=None,
+        retry_delay=5,
+    )
 
 
 async def list_chats():
@@ -582,55 +598,106 @@ async def list_chats():
     await client.disconnect()
 
 
-async def run():
-    """Main event loop."""
+async def run_session(stop_event: asyncio.Event):
+    """Serve one Telegram session.
+
+    Returns when shutdown was requested; raises if the session ended
+    unexpectedly, so the caller can reconnect.
+    """
     client = build_client()
-    await client.start()
+    disconnected = None
+    try:
+        await client.start()
 
-    me = await client.get_me()
-    log.info("Logged in as %s (id=%s)", me.first_name, me.id)
-    log.info("Monitoring peer %s for tweet links…", TELEGRAM_PEER_ID)
+        me = await client.get_me()
+        log.info("Logged in as %s (id=%s)", me.first_name, me.id)
+        log.info("Monitoring peer %s for tweet links…", TELEGRAM_PEER_ID)
 
-    @client.on(events.NewMessage(
-        chats=TELEGRAM_PEER_ID,
-        incoming=None if ANALYZE_OWN else True,
-    ))
-    async def handler(event):
-        matches = TWEET_URL_RE.findall(event.raw_text or "")
-        if not matches:
-            return
+        @client.on(events.NewMessage(
+            chats=TELEGRAM_PEER_ID,
+            incoming=None if ANALYZE_OWN else True,
+        ))
+        async def handler(event):
+            matches = TWEET_URL_RE.findall(event.raw_text or "")
+            if not matches:
+                return
 
-        for _handle, tweet_id in matches:
-            if _mark_seen(tweet_id):
-                log.info("Skipping already-analysed tweet %s", tweet_id)
-                continue
+            for _handle, tweet_id in matches:
+                if _mark_seen(tweet_id):
+                    log.info("Skipping already-analysed tweet %s", tweet_id)
+                    continue
 
-            log.info("Processing tweet %s", tweet_id)
-            tweet = await fetch_tweet(tweet_id)
+                log.info("Processing tweet %s", tweet_id)
+                tweet = await fetch_tweet(tweet_id)
 
-            if tweet is None:
-                await event.respond("Could not fetch tweet content — it may be deleted or private.")
-                continue
+                if tweet is None:
+                    await event.respond("Could not fetch tweet content — it may be deleted or private.")
+                    continue
 
-            await transcribe_video(tweet)
-            await download_and_resize_images(tweet)
-            analysis = await analyze_tweet(tweet)
-            response = format_response(tweet, analysis)
-            await event.respond(response, parse_mode="html")
-            log.info("Analysis posted for tweet %s", tweet_id)
+                await transcribe_video(tweet)
+                await download_and_resize_images(tweet)
+                analysis = await analyze_tweet(tweet)
+                response = format_response(tweet, analysis)
+                await event.respond(response, parse_mode="html")
+                log.info("Analysis posted for tweet %s", tweet_id)
 
-    # Graceful shutdown on SIGINT / SIGTERM
+        # Wait for either a shutdown request or the connection dropping.
+        # `client.disconnected` hands back a fresh asyncio.shield() wrapper on
+        # every access, so capture it once. Without watching it, a Telethon
+        # reconnect give-up leaves this coroutine blocked forever on a live
+        # process with a dead connection, and nothing restarts the add-on.
+        disconnected = client.disconnected
+        stop_task = asyncio.create_task(stop_event.wait())
+        try:
+            await asyncio.wait(
+                {stop_task, disconnected},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        finally:
+            stop_task.cancel()
+
+        if not stop_event.is_set():
+            # Retrieve the cause so it is logged by us rather than reported as
+            # "Future exception was never retrieved".
+            cause = disconnected.exception() if disconnected.done() else None
+            raise cause or ConnectionError("Telegram connection closed unexpectedly")
+    finally:
+        # Cancelling a shield's outer wrapper leaves Telethon's own future alone.
+        if disconnected is not None and not disconnected.done():
+            disconnected.cancel()
+        await client.disconnect()
+
+
+async def run():
+    """Serve Telegram sessions, reconnecting until asked to stop."""
     stop_event = asyncio.Event()
 
     def _shutdown(sig, _frame):
         log.info("Received %s, shutting down…", signal.Signals(sig).name)
         stop_event.set()
 
+    # Graceful shutdown on SIGINT / SIGTERM
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
-    await stop_event.wait()
-    await client.disconnect()
+    backoff = RECONNECT_BACKOFF_MIN
+    while not stop_event.is_set():
+        started = time.monotonic()
+        try:
+            await run_session(stop_event)
+        except Exception:
+            # A session that stayed up a while then died is a fresh outage,
+            # not an escalating failure — restart the backoff ladder.
+            if time.monotonic() - started >= RECONNECT_BACKOFF_RESET_AFTER:
+                backoff = RECONNECT_BACKOFF_MIN
+            if stop_event.is_set():
+                break
+            log.exception("Telegram session ended; reconnecting in %ss", backoff)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX)
+        else:
+            break
+
     log.info("Disconnected. Bye.")
 
 
