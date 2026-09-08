@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import base64
 import collections
+import contextlib
 import html
 import io
 import logging
@@ -54,6 +55,11 @@ RECONNECT_BACKOFF_MIN = 5
 RECONNECT_BACKOFF_MAX = 300
 # A session alive this long before dying counts as healthy: reset the backoff
 RECONNECT_BACKOFF_RESET_AFTER = 300
+# Errors worth reconnecting for. ConnectionError and TimeoutError are both
+# OSError subclasses; anything outside this set (revoked session, bad api_id)
+# is treated as non-recoverable so we exit and HA shows the add-on as failed
+# rather than retrying forever against a problem that will never clear.
+TRANSIENT_ERRORS = (ConnectionError, TimeoutError, OSError, asyncio.TimeoutError)
 
 # ---------------------------------------------------------------------------
 # Tweet URL regex & dedup cache
@@ -598,6 +604,28 @@ async def list_chats():
     await client.disconnect()
 
 
+async def _stopped_first(stop_event: asyncio.Event, coro) -> bool:
+    """Await `coro` unless shutdown is requested first.
+
+    Returns True if the stop event won, in which case `coro` was cancelled.
+    """
+    task = asyncio.ensure_future(coro)
+    stopper = asyncio.create_task(stop_event.wait())
+    try:
+        await asyncio.wait({task, stopper}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        stopper.cancel()
+
+    if task.done():
+        task.result()  # re-raise whatever it failed with
+        return False
+
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+    return True
+
+
 async def run_session(stop_event: asyncio.Event):
     """Serve one Telegram session.
 
@@ -607,7 +635,10 @@ async def run_session(stop_event: asyncio.Event):
     client = build_client()
     disconnected = None
     try:
-        await client.start()
+        # start() retries forever now, so let a shutdown request interrupt it
+        # instead of ignoring SIGTERM for the whole length of an outage.
+        if await _stopped_first(stop_event, client.start()):
+            return
 
         me = await client.get_me()
         log.info("Logged in as %s (id=%s)", me.first_name, me.id)
@@ -685,7 +716,7 @@ async def run():
         started = time.monotonic()
         try:
             await run_session(stop_event)
-        except Exception:
+        except TRANSIENT_ERRORS:
             # A session that stayed up a while then died is a fresh outage,
             # not an escalating failure — restart the backoff ladder.
             if time.monotonic() - started >= RECONNECT_BACKOFF_RESET_AFTER:
@@ -693,8 +724,19 @@ async def run():
             if stop_event.is_set():
                 break
             log.exception("Telegram session ended; reconnecting in %ss", backoff)
-            await asyncio.sleep(backoff)
+            # Wait out the backoff, but wake immediately on SIGTERM rather than
+            # ignoring it for up to RECONNECT_BACKOFF_MAX seconds.
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(stop_event.wait(), timeout=backoff)
+            if stop_event.is_set():
+                break
             backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX)
+        except Exception:
+            log.exception(
+                "Telegram session failed with a non-recoverable error; exiting so "
+                "Home Assistant surfaces the add-on as failed"
+            )
+            raise
         else:
             break
 
