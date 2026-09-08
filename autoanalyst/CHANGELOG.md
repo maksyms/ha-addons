@@ -1,3 +1,6 @@
+## 1.0.14
+- fix(autoanalyst): keep shutdown responsive and fail fast on permanent errors
+
 ## 1.0.13
 - fix(autoanalyst): survive Telegram reconnect give-up instead of hanging
 - fix(atomic-ingest): fix NoneType crash and duplicate URL detection
